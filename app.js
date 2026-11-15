@@ -99,6 +99,8 @@ $$('.tab').forEach((btn) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (tab === 'duty') renderDuty();
     if (tab === 'exam') renderExams();
+    if (tab === 'mistake') renderMistakes();
+    if (tab === 'review') renderReview();
   });
 });
 
@@ -170,9 +172,14 @@ function renderHomework() {
     });
   }
 
+  const pct = list.length ? Math.round((doneCount / list.length) * 100) : 0;
+  $('#hwProgress').hidden = list.length === 0;
+  $('#hwProgressBar').style.width = pct + '%';
+
   hwList.innerHTML = '';
-  list.forEach((item) => {
+  list.forEach((item, index) => {
     const li = document.createElement('li');
+    li.style.setProperty('--i', String(Math.min(index, 8)));
     const overdue = !item.done && item.due && item.due < today;
     li.className = 'hw-item' + (item.done ? ' done' : '') + (overdue ? ' overdue' : '');
 
@@ -271,6 +278,7 @@ function renderDuty() {
   data.days.forEach((value, i) => {
     const card = document.createElement('div');
     card.className = 'duty-day' + (i === todayIndex ? ' today' : '');
+    card.style.setProperty('--i', String(i));
 
     const label = document.createElement('div');
     label.className = 'duty-name';
@@ -332,10 +340,11 @@ function renderExams() {
   const list = loadExams().sort((a, b) => (a.date < b.date ? -1 : 1));
   examList.innerHTML = '';
 
-  list.forEach((item) => {
+  list.forEach((item, index) => {
     const diff = daysFromToday(item.date);
     const row = document.createElement('div');
     row.className = 'exam-item' + (diff < 0 ? ' past' : diff <= 3 ? ' soon' : '');
+    row.style.setProperty('--i', String(Math.min(index, 8)));
 
     const count = document.createElement('div');
     count.className = 'exam-count';
@@ -510,7 +519,10 @@ $('#mistakeForm').addEventListener('submit', async (e) => {
       subject,
       note,
       image: pendingBlob || null,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      level: 0,
+      nextReview: dateKey(),
+      reviewCount: 0
     });
     pendingBlob = null;
     const preview = $('#mistakePreview');
@@ -581,9 +593,10 @@ async function renderMistakes() {
 
   list.sort((a, b) => b.createdAt - a.createdAt);
 
-  list.forEach((item) => {
+  list.forEach((item, index) => {
     const card = document.createElement('div');
     card.className = 'mistake-card';
+    card.style.setProperty('--i', String(Math.min(index, 8)));
 
     let url = null;
     if (item.image) {
@@ -639,11 +652,214 @@ async function renderMistakes() {
 }
 
 /* ========================================================
+   错题复习（遗忘曲线）
+   ======================================================== */
+// 连续答对 1/2/3/4 次后分别隔 1/2/4/7 天，第 5 次算掌握，60 天后再见
+const REVIEW_INTERVALS = [1, 2, 4, 7, 15];
+const MASTER_DAYS = 60;
+const MASTER_LEVEL = 5;
+
+function reviewState(item) {
+  const level = typeof item.level === 'number' ? item.level : 0;
+  const next = typeof item.nextReview === 'string' && item.nextReview
+    ? item.nextReview
+    : dateKey(new Date(item.createdAt || Date.now()));
+  return { level, next };
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function renderReview() {
+  const stage = $('#reviewStage');
+  const done = $('#reviewDone');
+  const empty = $('#reviewEmpty');
+  const stats = $('#reviewStats');
+  const today = dateKey();
+
+  let all = [];
+  try {
+    all = await dbAll();
+  } catch (err) {
+    console.warn(err);
+    stage.innerHTML = '';
+    empty.hidden = false;
+    done.hidden = true;
+    return;
+  }
+
+  const due = all
+    .filter((x) => reviewState(x).next <= today)
+    .sort((a, b) => (reviewState(a).next < reviewState(b).next ? -1 : 1));
+  const mastered = all.filter((x) => reviewState(x).level >= MASTER_LEVEL).length;
+
+  stats.innerHTML = '';
+  if (all.length) {
+    [
+      { text: `待复习 ${due.length}`, cls: due.length ? 'urgent' : 'done' },
+      { text: `已掌握 ${mastered}`, cls: 'done' },
+      { text: `共 ${all.length} 道`, cls: '' }
+    ].forEach((c) => {
+      const span = document.createElement('span');
+      span.className = 'chip' + (c.cls ? ' ' + c.cls : '');
+      span.textContent = c.text;
+      stats.appendChild(span);
+    });
+  }
+
+  if (!all.length) {
+    stage.innerHTML = '';
+    stage.hidden = true;
+    done.hidden = true;
+    empty.hidden = false;
+    return;
+  }
+
+  empty.hidden = true;
+
+  if (!due.length) {
+    stage.innerHTML = '';
+    stage.hidden = true;
+    done.hidden = false;
+    const future = all
+      .map((x) => reviewState(x).next)
+      .filter((d) => d > today)
+      .sort()[0];
+    $('#reviewDoneText').textContent = future
+      ? `下一道安排在 ${formatCN(future)}，先去干点别的吧。`
+      : '所有错题都掌握了。';
+    return;
+  }
+
+  stage.hidden = false;
+  done.hidden = true;
+  renderReviewCard(due[0], due.length, all.length);
+}
+
+function renderReviewCard(item, remain, total) {
+  const stage = $('#reviewStage');
+  stage.innerHTML = '';
+
+  const card = document.createElement('div');
+  card.className = 'review-card';
+
+  const top = document.createElement('div');
+  top.className = 'review-top';
+
+  const tag = document.createElement('span');
+  tag.className = 'subject-tag';
+  tag.textContent = item.subject || '未分类';
+
+  const counter = document.createElement('span');
+  counter.className = 'review-count';
+  counter.textContent = `剩 ${remain} / 共 ${total}`;
+
+  top.appendChild(tag);
+  top.appendChild(counter);
+
+  const levels = document.createElement('div');
+  levels.className = 'levels';
+  levels.setAttribute('aria-label', `熟练度 ${reviewState(item).level} / ${MASTER_LEVEL}`);
+  for (let i = 0; i < MASTER_LEVEL; i++) {
+    const dot = document.createElement('i');
+    if (i < reviewState(item).level) dot.className = 'on';
+    levels.appendChild(dot);
+  }
+  top.appendChild(levels);
+
+  card.appendChild(top);
+
+  if (item.image) {
+    const url = URL.createObjectURL(item.image);
+    objectUrls.push(url);
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = item.note || '错题图片';
+    img.addEventListener('click', () => openLightbox(url));
+    card.appendChild(img);
+  }
+
+  const note = document.createElement('p');
+  note.className = 'review-note';
+  note.textContent = item.note || '（这道题没写错因）';
+  card.appendChild(note);
+
+  const actions = document.createElement('div');
+  actions.className = 'review-actions';
+
+  const again = document.createElement('button');
+  again.type = 'button';
+  again.className = 'btn ghost';
+  again.textContent = '再练一次';
+  again.addEventListener('click', () => gradeReview(item.id, false));
+
+  const good = document.createElement('button');
+  good.type = 'button';
+  good.className = 'btn primary';
+  good.textContent = '记住了';
+  good.addEventListener('click', () => gradeReview(item.id, true));
+
+  actions.appendChild(again);
+  actions.appendChild(good);
+  card.appendChild(actions);
+  stage.appendChild(card);
+}
+
+async function gradeReview(id, ok) {
+  let all;
+  try {
+    all = await dbAll();
+  } catch (err) {
+    toast('读取失败');
+    return;
+  }
+  const record = all.find((x) => x.id === id);
+  if (!record) return;
+
+  const state = reviewState(record);
+  let days;
+  if (ok) {
+    record.level = Math.min(state.level + 1, MASTER_LEVEL);
+    days = record.level >= MASTER_LEVEL
+      ? MASTER_DAYS
+      : REVIEW_INTERVALS[Math.min(state.level, REVIEW_INTERVALS.length - 1)];
+  } else {
+    record.level = 0;
+    days = 1;
+  }
+  record.nextReview = dateKey(new Date(Date.now() + days * 86400000));
+  record.reviewCount = (record.reviewCount || 0) + 1;
+  record.lastReview = Date.now();
+
+  try {
+    await dbPut(record);
+  } catch (err) {
+    toast('保存失败');
+    return;
+  }
+
+  const card = document.querySelector('.review-card');
+  if (card) {
+    card.classList.add('leaving');
+    await wait(180);
+  }
+
+  if (!ok) toast('明天再练一次');
+  else if (record.level >= MASTER_LEVEL) toast('已掌握，60 天后再见');
+  else toast(`${days} 天后再复习`);
+
+  await renderReview();
+  renderMistakes();
+}
+
+/* ========================================================
    初始化
    ======================================================== */
 renderHomework();
 renderExams();
 renderMistakes();
+renderReview();
 
 // 页面从后台回来时刷新倒计时/日期（跨天不至于显示错）
 document.addEventListener('visibilitychange', () => {

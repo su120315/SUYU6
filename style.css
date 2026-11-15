@@ -402,6 +402,147 @@ input[type="date"].input { width: 148px; padding-right: 8px; }
   cursor: pointer;
 }
 
+/* ---------- 作业完成进度 ---------- */
+.hw-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.hw-progress span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6c93ff, #17a673);
+  transition: width .45s cubic-bezier(.2, .9, .25, 1);
+}
+
+/* ---------- 复习卡片 ---------- */
+.review-stage { margin-top: 4px; }
+
+.review-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+  animation: cardIn .34s cubic-bezier(.2, .9, .25, 1) both;
+}
+.review-card.leaving { animation: cardOut .2s ease forwards; }
+
+.review-card img {
+  width: 100%;
+  max-height: 44vh;
+  object-fit: contain;
+  border-radius: 12px;
+  background: var(--card-2);
+  display: block;
+  cursor: zoom-in;
+}
+
+.review-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.review-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.levels { display: flex; gap: 4px; }
+.levels i {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--line);
+  display: block;
+}
+.levels i.on { background: var(--primary); }
+
+.review-note {
+  margin: 12px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  word-break: break-word;
+}
+.review-actions { display: flex; gap: 10px; margin-top: 14px; }
+.review-actions .btn { flex: 1 1 0; min-height: 48px; }
+.btn.ghost { background: var(--card-2); }
+
+.review-done { text-align: center; padding: 30px 16px 40px; }
+.review-done h3 { margin: 6px 0 6px; font-size: 17px; }
+.review-done p { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* ---------- 页脚 ---------- */
+.site-foot {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 4px 16px 18px;
+  text-align: center;
+  font-size: 13px;
+}
+.site-foot a {
+  color: var(--primary);
+  text-decoration: none;
+  padding: 8px 4px;
+  display: inline-block;
+}
+.site-foot a:active { opacity: .6; }
+
+/* ---------- 动画 ---------- */
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes itemIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cardOut {
+  to { opacity: 0; transform: translateX(-24px) scale(.97); }
+}
+@keyframes tickPop {
+  0% { transform: scale(.4); opacity: 0; }
+  60% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes tabPop {
+  0% { transform: scale(.82); }
+  60% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.panel { animation: panelIn .26s ease both; }
+.hw-item,
+.exam-item,
+.mistake-card,
+.duty-day {
+  animation: itemIn .32s ease both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+.check[aria-checked="true"] svg { animation: tickPop .3s ease both; }
+.tab.active svg { animation: tabPop .28s ease both; }
+.brand-logo { animation: floaty 4.5s ease-in-out infinite; }
+.empty-emoji { animation: bob 2.6s ease-in-out infinite; }
+.lightbox { animation: popIn .18s ease both; }
+
 /* ---------- 大屏 ---------- */
 @media (min-width: 720px) {
   body { padding-bottom: 24px; }
@@ -410,7 +551,7 @@ input[type="date"].input { width: 148px; padding-right: 8px; }
   .tabbar {
     position: sticky;
     bottom: 16px;
-    max-width: 460px;
+    max-width: 520px;
     margin: 0 auto 8px;
     border: 1px solid var(--line);
     border-radius: 18px;

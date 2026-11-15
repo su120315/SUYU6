@@ -1,12 +1,16 @@
 // 班级学习工具箱 - 离线缓存
-const CACHE_NAME = 'class-toolbox-v1';
+const CACHE_NAME = 'class-toolbox-v2';
 const CORE = [
   './',
   './index.html',
-  './style.css?v=1',
-  './app.js?v=1',
+  './style.css?v=2',
+  './app.js?v=2',
   './manifest.json',
-  './icon.svg'
+  './icon.svg',
+  './home/',
+  './home/index.html',
+  './home/style.css?v=1',
+  './home/app.js?v=1'
 ];
 
 self.addEventListener('install', (event) => {

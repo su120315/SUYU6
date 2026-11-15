@@ -8,7 +8,7 @@
 <title>班级学习工具箱</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎒</text></svg>">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
@@ -53,6 +53,7 @@
     </form>
 
     <div class="stats" id="hwStats"></div>
+    <div class="hw-progress" id="hwProgress" hidden><span id="hwProgressBar"></span></div>
     <ul class="list" id="hwList"></ul>
     <div class="empty" id="hwEmpty" hidden>
       <span class="empty-emoji">📚</span>
@@ -119,6 +120,29 @@
     </div>
   </section>
 
+  <!-- ========== 复习 ========== -->
+  <section class="panel" id="panel-review" hidden>
+    <div class="panel-head">
+      <h2>错题复习</h2>
+      <p class="panel-desc">按遗忘曲线提醒，复习一次就往后推几天。</p>
+    </div>
+
+    <div class="stats" id="reviewStats"></div>
+
+    <div class="review-stage" id="reviewStage"></div>
+
+    <div class="review-done" id="reviewDone" hidden>
+      <span class="empty-emoji">🎉</span>
+      <h3>今天的错题复习完了</h3>
+      <p id="reviewDoneText">明天再来。</p>
+    </div>
+
+    <div class="empty" id="reviewEmpty" hidden>
+      <span class="empty-emoji">🌱</span>
+      <p>还没有错题。先去「错题」标签记一道。</p>
+    </div>
+  </section>
+
 </main>
 
 <nav class="tabbar" aria-label="功能导航">
@@ -138,10 +162,18 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3Z"/><circle cx="12" cy="13" r="3.5"/></svg>
     <span>错题</span>
   </button>
+  <button class="tab" data-tab="review" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
+    <span>复习</span>
+  </button>
 </nav>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=1" defer></script>
+<footer class="site-foot">
+  <a href="home/">学生主页生成器 →</a>
+</footer>
+
+<script src="app.js?v=2" defer></script>
 </body>
 </html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#4f7cff">
+<title>学生主页生成器</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="back" href="../">← 工具箱</a>
+    <h1>学生主页生成器</h1>
+    <span class="spacer"></span>
+  </div>
+</header>
+
+<main class="layout">
+
+  <section class="editor">
+    <p class="lead">填几项，右边立刻出现你的主页。满意就导出一个 HTML 文件，发给同学看。</p>
+
+    <form id="form" autocomplete="off">
+      <label class="field">
+        <span>名字</span>
+        <input class="input" id="name" maxlength="10" placeholder="比如：蘇魚">
+      </label>
+
+      <label class="field">
+        <span>学校 · 年级</span>
+        <input class="input" id="school" maxlength="20" placeholder="比如：汇文中学 · 初二">
+      </label>
+
+      <label class="field">
+        <span>一句话介绍</span>
+        <textarea class="input" id="intro" maxlength="60" rows="2" placeholder="喜欢编程和骑行，正在学英语。"></textarea>
+      </label>
+
+      <label class="field">
+        <span>兴趣标签 <em>用逗号分开</em></span>
+        <input class="input" id="tags" maxlength="40" placeholder="编程, 骑行, 游戏, AI">
+      </label>
+
+      <div class="field">
+        <span>头像</span>
+        <div class="emoji-row" id="emojiRow">
+          <button type="button" class="emoji-btn active" data-emoji="🐟">🐟</button>
+          <button type="button" class="emoji-btn" data-emoji="😀">😀</button>
+          <button type="button" class="emoji-btn" data-emoji="🌟">🌟</button>
+          <button type="button" class="emoji-btn" data-emoji="🐱">🐱</button>
+          <button type="button" class="emoji-btn" data-emoji="🎧">🎧</button>
+          <button type="button" class="emoji-btn" data-emoji="🚀">🚀</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span>主题色</span>
+        <div class="color-row" id="colorRow">
+          <button type="button" class="color-btn active" data-color="#4f7cff" style="--c:#4f7cff"></button>
+          <button type="button" class="color-btn" data-color="#8b5cf6" style="--c:#8b5cf6"></button>
+          <button type="button" class="color-btn" data-color="#ec4899" style="--c:#ec4899"></button>
+          <button type="button" class="color-btn" data-color="#f97316" style="--c:#f97316"></button>
+          <button type="button" class="color-btn" data-color="#0ea5a5" style="--c:#0ea5a5"></button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn primary" id="exportBtn">导出 HTML</button>
+        <button type="button" class="btn" id="saveBtn">保存草稿</button>
+      </div>
+      <p class="tip" id="tip">所有内容只存在你自己的浏览器里。</p>
+    </form>
+  </section>
+
+  <section class="preview-wrap">
+    <p class="preview-label">预览</p>
+    <div class="phone">
+      <div class="phone-card" id="card">
+        <div class="card-glow"></div>
+        <div class="avatar" id="avatar">🐟</div>
+        <h2 class="p-name" id="pName">你的名字</h2>
+        <p class="p-school" id="pSchool">学校 · 年级</p>
+        <p class="p-intro" id="pIntro">一句话介绍会出现在这里。</p>
+        <div class="p-tags" id="pTags"></div>
+        <p class="p-foot">通过「班级学习工具箱」制作</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js?v=1" defer></script>
+</body>
+</html>
