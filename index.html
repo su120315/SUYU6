@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#4f7cff">
+<meta name="description" content="班级学习工具箱：作业清单、值日表、考试倒计时、错题整理，一个页面全搞定，数据存在本机。">
+<title>班级学习工具箱</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎒</text></svg>">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-logo">🎒</span>
+      <div>
+        <h1>班级学习工具箱</h1>
+        <p class="brand-sub" id="todayText">今天</p>
+      </div>
+    </div>
+    <button class="icon-btn" id="themeBtn" type="button" aria-label="切换深色模式">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ========== 作业 ========== -->
+  <section class="panel" id="panel-homework">
+    <div class="panel-head">
+      <h2>作业清单</h2>
+      <p class="panel-desc">记下要交的作业，做完划掉。</p>
+    </div>
+
+    <form class="card form" id="hwForm" autocomplete="off">
+      <div class="row">
+        <input class="input" id="hwSubject" list="subjectList" placeholder="科目（数学）" maxlength="12">
+        <input class="input grow" id="hwTitle" placeholder="作业内容，如：练习册 P32" maxlength="60" required>
+      </div>
+      <div class="row">
+        <input class="input" id="hwDue" type="date" aria-label="截止日期">
+        <button class="btn primary" type="submit">添加作业</button>
+      </div>
+      <datalist id="subjectList">
+        <option>语文</option><option>数学</option><option>英语</option>
+        <option>物理</option><option>化学</option><option>生物</option>
+        <option>历史</option><option>地理</option><option>道法</option><option>其他</option>
+      </datalist>
+    </form>
+
+    <div class="stats" id="hwStats"></div>
+    <ul class="list" id="hwList"></ul>
+    <div class="empty" id="hwEmpty" hidden>
+      <span class="empty-emoji">📚</span>
+      <p>还没有作业，先加一条吧。</p>
+    </div>
+  </section>
+
+  <!-- ========== 值日 ========== -->
+  <section class="panel" id="panel-duty" hidden>
+    <div class="panel-head">
+      <h2>值日表</h2>
+      <p class="panel-desc">点一下就能改，谁值日一目了然。</p>
+    </div>
+    <div class="duty-grid" id="dutyGrid"></div>
+    <p class="hint">今日值日：<strong id="dutyToday">未安排</strong></p>
+  </section>
+
+  <!-- ========== 考试 ========== -->
+  <section class="panel" id="panel-exam" hidden>
+    <div class="panel-head">
+      <h2>考试倒计时</h2>
+      <p class="panel-desc">离考试还有几天，心里有个数。</p>
+    </div>
+
+    <form class="card form" id="examForm" autocomplete="off">
+      <div class="row">
+        <input class="input grow" id="examName" placeholder="考试名称，如：期中数学" maxlength="30" required>
+        <input class="input" id="examDate" type="date" required aria-label="考试日期">
+        <button class="btn primary" type="submit">添加</button>
+      </div>
+    </form>
+
+    <div class="exam-list" id="examList"></div>
+    <div class="empty" id="examEmpty" hidden>
+      <span class="empty-emoji">⏳</span>
+      <p>还没有考试安排。</p>
+    </div>
+  </section>
+
+  <!-- ========== 错题 ========== -->
+  <section class="panel" id="panel-mistake" hidden>
+    <div class="panel-head">
+      <h2>错题本</h2>
+      <p class="panel-desc">拍下题目，写上错因，考前翻一翻。</p>
+    </div>
+
+    <form class="card form" id="mistakeForm" autocomplete="off">
+      <label class="upload" id="uploadBox">
+        <input type="file" id="mistakeFile" accept="image/*" hidden>
+        <img id="mistakePreview" alt="预览" hidden>
+        <span class="upload-tip" id="uploadTip">📷 选择题目照片</span>
+      </label>
+      <div class="row">
+        <input class="input" id="mistakeSubject" list="subjectList" placeholder="科目" maxlength="12">
+        <input class="input grow" id="mistakeNote" placeholder="错因 / 正确思路" maxlength="80">
+      </div>
+      <button class="btn primary" type="submit" id="mistakeSubmit">保存错题</button>
+    </form>
+
+    <div class="mistake-grid" id="mistakeGrid"></div>
+    <div class="empty" id="mistakeEmpty" hidden>
+      <span class="empty-emoji">📝</span>
+      <p>错题本还是空的。</p>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabbar" aria-label="功能导航">
+  <button class="tab active" data-tab="homework" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M14 3v6h6"/></svg>
+    <span>作业</span>
+  </button>
+  <button class="tab" data-tab="duty" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V9l7-6 7 6v12"/><path d="M9 21v-7h6v7"/></svg>
+    <span>值日</span>
+  </button>
+  <button class="tab" data-tab="exam" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
+    <span>考试</span>
+  </button>
+  <button class="tab" data-tab="mistake" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+    <span>错题</span>
+  </button>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js?v=1" defer></script>
+</body>
+</html>
