@@ -85,7 +85,63 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 }
 .icon-btn:active { transform: scale(.94); }
 
-/* ---------- 布局 ---------- */
+.topbar-actions { display: flex; gap: 8px; }
+
+/* ---------- 搜索弹层 ---------- */
+.search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--bg);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: slideUp .25s ease both;
+}
+.search-box {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+}
+.search-box .input { flex: 1 1 auto; width: auto; }
+.search-results { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.search-group-title { font-size: 12px; color: var(--muted); padding: 4px 4px; }
+.search-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.search-item:active { background: var(--card-2); }
+.search-item .si-icon { font-size: 20px; flex: 0 0 auto; }
+.search-item .si-body { flex: 1 1 auto; min-width: 0; }
+.search-item .si-title { font-size: 14px; font-weight: 600; word-break: break-word; }
+.search-item .si-sub { font-size: 12px; color: var(--muted); margin-top: 2px; word-break: break-word; }
+.search-empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+
+/* ---------- 今日待办 ---------- */
+.today-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.today-item {
+  width: 100%;
+  text-align: left;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--card-2);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .15s;
+}
+.today-item:active { background: var(--primary-soft); }
+.today-item.urgent { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
+
+/* ---------- 大屏 ---------- */
 .wrap { max-width: 760px; margin: 0 auto; padding: 18px 16px 8px; }
 
 .panel-head { margin-bottom: 14px; }
@@ -528,6 +584,10 @@ input[type="date"].input { width: 148px; padding-right: 8px; }
   0% { opacity: 0; transform: scale(.9); }
   100% { opacity: 1; transform: scale(1); }
 }
+@keyframes slideUp {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
 
 .panel, .view { animation: panelIn .26s ease both; }
 .hw-item,
@@ -902,6 +962,28 @@ input[type="date"].input { width: 148px; padding-right: 8px; }
 .mood-item .body { flex: 1 1 auto; min-width: 0; }
 .mood-item .date { font-size: 12px; color: var(--muted); }
 .mood-item .text { font-size: 14px; margin-top: 3px; word-break: break-word; white-space: pre-wrap; }
+
+/* ---------- 左滑删除 ---------- */
+.hw-item, .word-item, .money-item, .mood-item { position: relative; overflow: hidden; }
+.swipe-del {
+  position: absolute;
+  top: 0; right: -90px;
+  width: 90px; height: 100%;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .note-card .del { opacity: 0; }
+  .note-card:hover .del { opacity: 1; }
+}
+@media (hover: none) {
+  .note-card .del { opacity: 1; background: rgba(0,0,0,.3); color: #fff; }
+}
 
 /* ---------- 大屏 ---------- */
 @media (min-width: 720px) {

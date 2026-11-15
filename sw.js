@@ -1,10 +1,10 @@
 // 班级学习工具箱 - 离线缓存
-const CACHE_NAME = 'class-toolbox-v4';
+const CACHE_NAME = 'class-toolbox-v5';
 const CORE = [
   './',
   './index.html',
-  './style.css?v=4',
-  './app.js?v=4',
+  './style.css?v=5',
+  './app.js?v=5',
   './manifest.json',
   './icon.svg',
   './home/',

@@ -8,7 +8,7 @@
 <title>班级学习工具箱</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎒</text></svg>">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -24,11 +24,27 @@
         <p class="brand-sub" id="todayText">今天</p>
       </div>
     </div>
-    <button class="icon-btn" id="themeBtn" type="button" aria-label="切换深色模式">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
-    </button>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="searchBtn" type="button" aria-label="搜索">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </button>
+      <button class="icon-btn" id="themeBtn" type="button" aria-label="切换深色模式">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+      </button>
+    </div>
   </div>
 </header>
+
+<!-- 全局搜索弹层 -->
+<div class="search-overlay" id="searchOverlay" hidden>
+  <div class="search-box card">
+    <input class="input" id="searchInput" placeholder="搜索作业、错题、单词、便签、账目…" maxlength="40">
+    <button class="icon-btn" id="searchClose" type="button" aria-label="关闭">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+  </div>
+  <div class="search-results" id="searchResults"></div>
+</div>
 
 <main class="wrap">
 
@@ -62,9 +78,10 @@
 
     <div class="card today-card">
       <div class="card-head">
-        <h3>今天</h3>
+        <h3>今日待办</h3>
         <span class="muted" id="todayDuty">值日：未安排</span>
       </div>
+      <div class="today-list" id="todayList"></div>
       <div class="today-classes" id="todayClasses"></div>
     </div>
 
@@ -360,7 +377,7 @@
     <div class="card settings-card">
       <h3>更多</h3>
       <a class="settings-link" href="home/">学生主页生成器 →</a>
-      <p class="muted">版本 v4 · 纯静态网页，无需注册，离线可用。</p>
+      <p class="muted">版本 v5 · 纯静态网页，无需注册，离线可用。</p>
     </div>
 
     <div class="card settings-card danger-zone">
@@ -545,6 +562,6 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=4" defer></script>
+<script src="app.js?v=5" defer></script>
 </body>
 </html>

@@ -171,6 +171,164 @@ $$('.tab').forEach((btn) => btn.addEventListener('click', () => go(btn.dataset.t
 $('#backBtn').addEventListener('click', () => go('home'));
 
 /* ========================================================
+   全局搜索
+   ======================================================== */
+const searchOverlay = $('#searchOverlay');
+const searchInput = $('#searchInput');
+const searchResults = $('#searchResults');
+
+function openSearch() {
+  searchOverlay.hidden = false;
+  setTimeout(() => searchInput.focus(), 50);
+  doSearch('');
+}
+function closeSearch() {
+  searchOverlay.hidden = true;
+  searchInput.value = '';
+}
+
+$('#searchBtn').addEventListener('click', openSearch);
+$('#searchClose').addEventListener('click', closeSearch);
+searchInput.addEventListener('input', () => doSearch(searchInput.value.trim()));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !searchOverlay.hidden) closeSearch();
+});
+
+async function doSearch(q) {
+  searchResults.innerHTML = '';
+  if (!q) {
+    const hint = document.createElement('p');
+    hint.className = 'search-empty';
+    hint.textContent = '输入关键词搜索作业、单词、便签、账目、成绩…';
+    searchResults.appendChild(hint);
+    return;
+  }
+
+  const lq = q.toLowerCase();
+  const groups = [];
+
+  // 作业
+  const hw = loadHomework().filter((x) =>
+    x.title.toLowerCase().includes(lq) || (x.subject || '').toLowerCase().includes(lq)
+  );
+  if (hw.length) groups.push({ title: '作业', icon: '📕', items: hw.map((x) => ({ title: x.title, sub: `${x.subject}${x.due ? ' · ' + x.due : ''}`, go: 'homework' })) });
+
+  // 单词
+  const words = loadWords().filter((x) => x.term.toLowerCase().includes(lq) || x.def.toLowerCase().includes(lq));
+  if (words.length) groups.push({ title: '单词', icon: '🔤', items: words.map((x) => ({ title: x.term, sub: x.def, go: 'words' })) });
+
+  // 便签
+  const notes = loadNotes().filter((x) => x.title.toLowerCase().includes(lq) || x.body.toLowerCase().includes(lq));
+  if (notes.length) groups.push({ title: '便签', icon: '📝', items: notes.map((x) => ({ title: x.title || x.body.slice(0, 12), sub: x.body, go: 'notes' })) });
+
+  // 账目
+  const money = loadMoney().filter((x) => (x.note || '').toLowerCase().includes(lq));
+  if (money.length) groups.push({ title: '账目', icon: '💰', items: money.slice(0, 10).map((x) => ({ title: `${x.type === 'income' ? '+' : '-'}${x.amount}`, sub: `${x.note || ''} ${x.date}`.trim(), go: 'money' })) });
+
+  // 成绩
+  const grades = store.get(KEY_GRADES, []).filter((x) => (x.subject || '').toLowerCase().includes(lq) || (x.name || '').toLowerCase().includes(lq));
+  if (grades.length) groups.push({ title: '成绩', icon: '📊', items: grades.slice(0, 10).map((x) => ({ title: `${x.score}/${x.full} ${x.subject}`, sub: x.name, go: 'grades' })) });
+
+  if (!groups.length) {
+    const empty = document.createElement('p');
+    empty.className = 'search-empty';
+    empty.textContent = '没找到相关内容。';
+    searchResults.appendChild(empty);
+    return;
+  }
+
+  groups.forEach((g) => {
+    const title = document.createElement('div');
+    title.className = 'search-group-title';
+    title.textContent = g.title;
+    searchResults.appendChild(title);
+    g.items.forEach((it) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'search-item';
+      item.innerHTML = `<span class="si-icon">${g.icon}</span><div class="si-body"><div class="si-title"></div><div class="si-sub"></div></div>`;
+      item.querySelector('.si-title').textContent = it.title;
+      item.querySelector('.si-sub').textContent = it.sub || '';
+      item.addEventListener('click', () => { closeSearch(); go(it.go); });
+      searchResults.appendChild(item);
+    });
+  });
+}
+
+/* ========================================================
+   左滑删除（移动端核心交互）
+   ======================================================== */
+function enableSwipeDelete(listEl, onDelete) {
+  let startX = 0, currentX = 0, dragging = false, openEl = null;
+
+  function closeOpen() {
+    if (openEl) {
+      openEl.style.transform = '';
+      openEl.style.transition = 'transform .2s';
+      openEl = null;
+    }
+  }
+
+  listEl.addEventListener('touchstart', (e) => {
+    const item = e.target.closest('.hw-item, .word-item, .money-item, .mood-item');
+    if (!item) return;
+    if (openEl && openEl !== item) closeOpen();
+    startX = e.touches[0].clientX;
+    dragging = true;
+    item.style.transition = 'none';
+  }, { passive: true });
+
+  listEl.addEventListener('touchmove', (e) => {
+    if (!dragging) return;
+    const item = e.target.closest('.hw-item, .word-item, .money-item, .mood-item');
+    if (!item) return;
+    currentX = e.touches[0].clientX;
+    const dx = currentX - startX;
+    if (dx < 0) {
+      item.style.transform = `translateX(${Math.max(dx, -90)}px)`;
+    }
+  }, { passive: true });
+
+  listEl.addEventListener('touchend', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    const item = e.target.closest('.hw-item, .word-item, .money-item, .mood-item');
+    if (!item) return;
+    const dx = currentX - startX;
+    item.style.transition = 'transform .2s';
+    if (dx < -60) {
+      item.style.transform = 'translateX(-90px)';
+      openEl = item;
+      let delBtn = item.querySelector('.swipe-del');
+      if (!delBtn) {
+        delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'swipe-del';
+        delBtn.textContent = '删除';
+        delBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const id = item.dataset.id;
+          if (id) onDelete(id);
+        });
+        item.appendChild(delBtn);
+      }
+    } else {
+      item.style.transform = '';
+      if (openEl === item) openEl = null;
+    }
+  });
+
+  listEl.addEventListener('click', (e) => {
+    const item = e.target.closest('.hw-item, .word-item, .money-item, .mood-item');
+    if (!item || item !== openEl) closeOpen();
+  });
+}
+
+function trashIcon() {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>';
+}
+
+/* ========================================================
    首页仪表盘
    ======================================================== */
 async function renderHome() {
@@ -211,6 +369,41 @@ async function renderHome() {
   const duty = loadDuty();
   $('#todayDuty').textContent = '值日：' + (duty.days[todayWeekIndex()] || '未安排');
 
+  // 今日待办聚合：今天到期的作业 + 今天的考试 + 今天该复习的错题
+  const todayList = $('#todayList');
+  todayList.innerHTML = '';
+  const today = dateKey();
+  const todayHw = hw.filter((x) => !x.done && x.due === today);
+  const todayExam = loadExams().filter((x) => x.date === today);
+
+  let reviewToday = 0;
+  try {
+    const all = await dbAll();
+    reviewToday = all.filter((x) => reviewState(x).next <= today).length;
+  } catch (e) {}
+
+  const items = [];
+  if (todayHw.length) items.push({ icon: '📕', label: `作业 ${todayHw.length} 项到期`, go: 'homework', urgent: true });
+  if (todayExam.length) items.push({ icon: '📝', label: `考试：${todayExam.map((e) => e.name).join('、')}`, go: 'exam', urgent: true });
+  if (reviewToday) items.push({ icon: '🔁', label: `错题复习 ${reviewToday} 道`, go: 'review' });
+  if (duty.days[todayWeekIndex()]) items.push({ icon: '🧹', label: `值日：${duty.days[todayWeekIndex()]}`, go: 'duty' });
+
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'muted';
+    empty.textContent = '今天没有待办，可以专注学习。';
+    todayList.appendChild(empty);
+  } else {
+    items.forEach((it) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'today-item' + (it.urgent ? ' urgent' : '');
+      btn.textContent = `${it.icon}  ${it.label}`;
+      btn.addEventListener('click', () => go(it.go));
+      todayList.appendChild(btn);
+    });
+  }
+
   const classes = loadSchedule().days[todayWeekIndex()].filter(Boolean);
   const box = $('#todayClasses');
   box.innerHTML = '';
@@ -220,6 +413,11 @@ async function renderHome() {
     span.textContent = '今天还没排课，去「课程表」填一下。';
     box.appendChild(span);
   } else {
+    const label = document.createElement('span');
+    label.className = 'muted';
+    label.style.marginRight = '6px';
+    label.textContent = '课程';
+    box.appendChild(label);
     classes.forEach((name) => {
       const tag = document.createElement('span');
       tag.className = 'subject-tag';
@@ -295,6 +493,7 @@ function renderHomework() {
   list.forEach((item, index) => {
     const li = document.createElement('li');
     li.style.setProperty('--i', String(Math.min(index, 8)));
+    li.dataset.id = item.id;
     const overdue = !item.done && item.due && item.due < today;
     li.className = 'hw-item' + (item.done ? ' done' : '') + (overdue ? ' overdue' : '');
 
@@ -1628,6 +1827,7 @@ function renderWords() {
   ul.innerHTML = '';
   list.slice().reverse().forEach((w, idx) => {
     const li = document.createElement('li');
+    li.dataset.id = w.id;
     li.className = 'word-item' + (w.known ? ' known' : '');
     li.style.setProperty('--i', String(Math.min(idx, 8)));
 
@@ -1810,6 +2010,7 @@ function renderMoney() {
   ul.innerHTML = '';
   list.slice(0, 50).forEach((item, idx) => {
     const li = document.createElement('li');
+    li.dataset.id = item.id;
     li.className = 'money-item';
     li.style.setProperty('--i', String(Math.min(idx, 8)));
 
@@ -1931,6 +2132,7 @@ function renderMood() {
   ul.innerHTML = '';
   list.slice(0, 30).forEach((item, idx) => {
     const li = document.createElement('li');
+    li.dataset.id = item.date;
     li.className = 'mood-item';
     li.style.setProperty('--i', String(Math.min(idx, 8)));
 
@@ -2094,6 +2296,28 @@ $('#wipeData').addEventListener('click', async () => {
    ======================================================== */
 updateFocusUI();
 show(location.hash.replace(/^#\//, '') || 'home');
+
+// 左滑删除（每个列表只绑定一次，列表容器在 DOM 中常驻）
+enableSwipeDelete($('#hwList'), (id) => {
+  store.set(KEY_HW, loadHomework().filter((x) => x.id !== id));
+  renderHomework();
+  toast('已删除');
+});
+enableSwipeDelete($('#wordList'), (id) => {
+  store.set(KEY_WORDS, loadWords().filter((x) => x.id !== id));
+  renderWords();
+  toast('已删除');
+});
+enableSwipeDelete($('#moneyList'), (id) => {
+  store.set(KEY_MONEY, loadMoney().filter((x) => x.id !== id));
+  renderMoney();
+  toast('已删除');
+});
+enableSwipeDelete($('#moodList'), (id) => {
+  store.set(KEY_MOOD, loadMoods().filter((x) => x.date !== id));
+  renderMood();
+  toast('已删除');
+});
 
 // 页面从后台回来时刷新倒计时/日期（跨天不至于显示错）
 document.addEventListener('visibilitychange', () => {
