@@ -1,0 +1,3 @@
+# 本地凭据与调试文件，禁止提交
+.ai-handoff/
+.DS_Store
