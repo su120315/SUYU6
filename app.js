@@ -74,7 +74,11 @@ const KEY_SCHEDULE = 'ct.schedule';
 const KEY_FOCUS = 'ct.focus';
 const KEY_GRADES = 'ct.grades';
 const KEY_HABITS = 'ct.habits';
-const BACKUP_KEYS = [KEY_HW, KEY_DUTY, KEY_EXAM, KEY_SCHEDULE, KEY_FOCUS, KEY_GRADES, KEY_HABITS, 'ct.theme', 'ct.homepage'];
+const KEY_WORDS = 'ct.words';
+const KEY_NOTES = 'ct.notes';
+const KEY_MONEY = 'ct.money';
+const KEY_MOOD = 'ct.mood';
+const BACKUP_KEYS = [KEY_HW, KEY_DUTY, KEY_EXAM, KEY_SCHEDULE, KEY_FOCUS, KEY_GRADES, KEY_HABITS, KEY_WORDS, KEY_NOTES, KEY_MONEY, KEY_MOOD, 'ct.theme', 'ct.homepage'];
 
 const WEEK = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const todayWeekIndex = () => (new Date().getDay() + 6) % 7;
@@ -112,6 +116,11 @@ const VIEW_TITLES = {
   focus: '专注计时',
   grades: '成绩记录',
   habit: '习惯打卡',
+  calendar: '日历',
+  words: '单词本',
+  notes: '便签墙',
+  money: '记账',
+  mood: '心情日记',
   settings: '我的'
 };
 let currentView = 'home';
@@ -142,6 +151,11 @@ function show(name) {
   if (name === 'review') renderReview();
   if (name === 'grades') renderGrades();
   if (name === 'habit') renderHabits();
+  if (name === 'calendar') renderCalendar();
+  if (name === 'words') renderWords();
+  if (name === 'notes') renderNotes();
+  if (name === 'money') renderMoney();
+  if (name === 'mood') renderMood();
   if (name === 'focus') renderFocusStats();
 }
 
@@ -1426,6 +1440,534 @@ function renderHabits() {
   });
 
   $('#habitEmpty').hidden = list.length > 0;
+  ul.hidden = list.length === 0;
+}
+
+/* ========================================================
+   日历
+   ======================================================== */
+let calDate = new Date();
+calDate.setDate(1);
+
+function renderCalendar() {
+  const year = calDate.getFullYear();
+  const month = calDate.getMonth();
+  $('#calTitle').textContent = `${year} 年 ${month + 1} 月`;
+
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysPrevMonth = new Date(year, month, 0).getDate();
+
+  const today = dateKey();
+  const hw = loadHomework();
+  const exams = loadExams();
+  const duty = loadDuty().days;
+
+  const cells = [];
+  // 上个月填充
+  for (let i = firstWeekday - 1; i >= 0; i--) {
+    cells.push({ day: daysPrevMonth - i, other: true, date: dateKey(new Date(year, month - 1, daysPrevMonth - i)) });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, other: false, date: dateKey(new Date(year, month, d)) });
+  }
+  while (cells.length % 7) {
+    const next = cells.length - firstWeekday - daysInMonth + 1;
+    cells.push({ day: next, other: true, date: dateKey(new Date(year, month + 1, next)) });
+  }
+
+  const grid = $('#calGrid');
+  grid.innerHTML = '';
+  cells.forEach((c, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' + (c.other ? ' other' : '') + (c.date === today ? ' today' : '');
+    cell.style.setProperty('--i', String(i % 7));
+    cell.textContent = String(c.day);
+
+    const dots = [];
+    if (hw.some((h) => h.due === c.date)) dots.push('hw');
+    if (exams.some((e) => e.date === c.date)) dots.push('exam');
+    // 值日按星期几（month 固定，用 date 的星期）
+    const w = (new Date(c.date).getDay() + 6) % 7;
+    if (duty[w] && !c.other) dots.push('duty');
+
+    if (dots.length) {
+      const dotBox = document.createElement('div');
+      dotBox.className = 'cal-dots';
+      dots.forEach((cls) => {
+        const d = document.createElement('i');
+        d.className = cls;
+        dotBox.appendChild(d);
+      });
+      cell.appendChild(dotBox);
+    }
+
+    cell.addEventListener('click', () => {
+      $$('.cal-cell').forEach((cc) => cc.classList.remove('selected'));
+      cell.classList.add('selected');
+      renderCalDetail(c.date);
+    });
+    grid.appendChild(cell);
+  });
+
+  // 默认选中今天
+  const todayCell = $$('.cal-cell').find((c) => c.textContent.split('\n')[0] && c.classList.contains('today'));
+  if (todayCell) {
+    todayCell.classList.add('selected');
+    renderCalDetail(today);
+  } else {
+    $('#calDetail').hidden = true;
+  }
+}
+
+function renderCalDetail(dateKeyOrCell) {
+  const date = typeof dateKeyOrCell === 'string' ? dateKeyOrCell : null;
+  let target = date;
+  if (!target) {
+    // 从 cell 的日期推算
+    const cellText = dateKeyOrCell.textContent.split('\n')[0].trim();
+    // 简单处理：取第一个选中 cell 的 date 属性（我们没存）——改用事件中的 date
+    return;
+  }
+
+  const hw = loadHomework().filter((h) => h.due === target);
+  const exams = loadExams().filter((e) => e.date === target);
+  const w = (new Date(target).getDay() + 6) % 7;
+  const dutyName = loadDuty().days[w] || '';
+  const classes = loadSchedule().days[w].filter(Boolean);
+
+  $('#calDetail').hidden = false;
+  $('#calDetailTitle').textContent = formatCN(target);
+  const body = $('#calDetailBody');
+  body.innerHTML = '';
+
+  if (classes.length) {
+    body.appendChild(makeDetailItem('📚', `课程：${classes.join('、')}`));
+  }
+  if (dutyName) body.appendChild(makeDetailItem('🧹', `值日：${dutyName}`));
+  hw.forEach((h) => body.appendChild(makeDetailItem('📕', `作业：${h.subject} ${h.title}`)));
+  exams.forEach((e) => body.appendChild(makeDetailItem('📝', `考试：${e.name}`)));
+
+  if (!body.children.length) {
+    body.innerHTML = '<p class="muted">这天没有安排。</p>';
+  }
+}
+
+function makeDetailItem(icon, text) {
+  const div = document.createElement('div');
+  div.className = 'cal-detail-item';
+  div.textContent = `${icon}  ${text}`;
+  return div;
+}
+
+$('#calPrev').addEventListener('click', () => {
+  calDate.setMonth(calDate.getMonth() - 1);
+  renderCalendar();
+});
+$('#calNext').addEventListener('click', () => {
+  calDate.setMonth(calDate.getMonth() + 1);
+  renderCalendar();
+});
+
+/* ========================================================
+   单词本
+   ======================================================== */
+function loadWords() {
+  const list = store.get(KEY_WORDS, []);
+  return Array.isArray(list) ? list : [];
+}
+
+let reviewQueue = [];
+let reviewCursor = 0;
+
+$('#wordForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const term = $('#wordTerm').value.trim();
+  const def = $('#wordDef').value.trim();
+  if (!term || !def) return;
+  const list = loadWords();
+  list.push({ id: uid(), term, def, known: false, createdAt: Date.now() });
+  store.set(KEY_WORDS, list);
+  $('#wordTerm').value = '';
+  $('#wordDef').value = '';
+  renderWords();
+  toast('已添加');
+});
+
+function renderWords() {
+  const list = loadWords();
+  const known = list.filter((w) => w.known).length;
+
+  const stats = $('#wordStats');
+  stats.innerHTML = '';
+  if (list.length) {
+    [
+      { text: `共 ${list.length} 个`, cls: '' },
+      { text: `已掌握 ${known}`, cls: 'done' },
+      { text: `待复习 ${list.length - known}`, cls: list.length - known ? 'urgent' : 'done' }
+    ].forEach((c) => {
+      const span = document.createElement('span');
+      span.className = 'chip' + (c.cls ? ' ' + c.cls : '');
+      span.textContent = c.text;
+      stats.appendChild(span);
+    });
+    if (list.length - known > 0) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn primary';
+      btn.textContent = '开始复习';
+      btn.style.minHeight = '30px';
+      btn.style.padding = '0 12px';
+      btn.style.fontSize = '13px';
+      btn.addEventListener('click', startWordReview);
+      stats.appendChild(btn);
+    }
+  }
+
+  const ul = $('#wordList');
+  ul.innerHTML = '';
+  list.slice().reverse().forEach((w, idx) => {
+    const li = document.createElement('li');
+    li.className = 'word-item' + (w.known ? ' known' : '');
+    li.style.setProperty('--i', String(Math.min(idx, 8)));
+
+    const term = document.createElement('span');
+    term.className = 'term';
+    term.textContent = w.term;
+
+    const def = document.createElement('span');
+    def.className = 'def';
+    def.textContent = w.def;
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.setAttribute('aria-label', `删除单词 ${w.term}`);
+    del.innerHTML = trashIcon();
+    del.addEventListener('click', () => {
+      store.set(KEY_WORDS, loadWords().filter((x) => x.id !== w.id));
+      renderWords();
+    });
+
+    li.appendChild(term);
+    li.appendChild(def);
+    li.appendChild(del);
+    ul.appendChild(li);
+  });
+
+  $('#wordEmpty').hidden = list.length > 0;
+  ul.hidden = list.length === 0;
+}
+
+function startWordReview() {
+  reviewQueue = loadWords().filter((w) => !w.known);
+  reviewCursor = 0;
+  if (!reviewQueue.length) {
+    $('#wordReview').hidden = true;
+    toast('没有待复习的单词');
+    return;
+  }
+  $('#wordReview').hidden = false;
+  $('#wordReviewDef').hidden = true;
+  showReviewWord();
+}
+
+function showReviewWord() {
+  if (reviewCursor >= reviewQueue.length) {
+    $('#wordReview').hidden = true;
+    toast('这轮复习完了');
+    renderWords();
+    return;
+  }
+  const w = reviewQueue[reviewCursor];
+  $('#wordReviewTerm').textContent = w.term;
+  $('#wordReviewDef').textContent = w.def;
+  $('#wordReviewDef').hidden = true;
+  $('#wordReviewCount').textContent = `第 ${reviewCursor + 1} / ${reviewQueue.length} 个`;
+}
+
+$('#wordShow').addEventListener('click', () => {
+  $('#wordReviewDef').hidden = false;
+});
+$('#wordKnow').addEventListener('click', () => {
+  const w = reviewQueue[reviewCursor];
+  if (w) {
+    const list = loadWords();
+    const target = list.find((x) => x.id === w.id);
+    if (target) {
+      target.known = true;
+      store.set(KEY_WORDS, list);
+    }
+  }
+  reviewCursor++;
+  showReviewWord();
+  if ($('#wordReview').hidden) renderWords();
+});
+
+// 在单词本视图里，用「看答案 / 记住了」按钮开始复习
+document.addEventListener('view-words', () => {}); // placeholder
+
+/* ========================================================
+   便签墙
+   ======================================================== */
+function loadNotes() {
+  const list = store.get(KEY_NOTES, []);
+  return Array.isArray(list) ? list : [];
+}
+
+$('#noteForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const title = $('#noteTitle').value.trim();
+  const body = $('#noteBody').value.trim();
+  const color = $('#noteColor').value || '#ffe08a';
+  if (!body && !title) return;
+  const list = loadNotes();
+  list.push({ id: uid(), title, body, color, createdAt: Date.now() });
+  store.set(KEY_NOTES, list);
+  $('#noteTitle').value = '';
+  $('#noteBody').value = '';
+  renderNotes();
+  toast('已添加');
+});
+
+function renderNotes() {
+  const list = loadNotes();
+  const wall = $('#noteWall');
+  wall.innerHTML = '';
+  list.slice().reverse().forEach((note, idx) => {
+    const card = document.createElement('div');
+    card.className = 'note-card';
+    card.style.background = note.color;
+    card.style.setProperty('--i', String(Math.min(idx, 8)));
+
+    if (note.title) {
+      const h4 = document.createElement('h4');
+      h4.textContent = note.title;
+      card.appendChild(h4);
+    }
+    if (note.body) {
+      const p = document.createElement('p');
+      p.textContent = note.body;
+      card.appendChild(p);
+    }
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.setAttribute('aria-label', '删除便签');
+    del.innerHTML = trashIcon();
+    del.addEventListener('click', () => {
+      store.set(KEY_NOTES, loadNotes().filter((n) => n.id !== note.id));
+      renderNotes();
+    });
+    card.appendChild(del);
+    wall.appendChild(card);
+  });
+
+  $('#noteEmpty').hidden = list.length > 0;
+  wall.hidden = list.length === 0;
+}
+
+/* ========================================================
+   记账
+   ======================================================== */
+function loadMoney() {
+  const list = store.get(KEY_MONEY, []);
+  return Array.isArray(list) ? list : [];
+}
+
+$('#moneyDate').value = dateKey();
+
+$('#moneyForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const type = document.querySelector('input[name="moneyType"]:checked').value;
+  const amount = Number($('#moneyAmount').value);
+  const note = $('#moneyNote').value.trim();
+  const date = $('#moneyDate').value;
+  if (!amount || amount <= 0 || !date) return;
+  const list = loadMoney();
+  list.push({ id: uid(), type, amount, note, date, createdAt: Date.now() });
+  store.set(KEY_MONEY, list);
+  $('#moneyAmount').value = '';
+  $('#moneyNote').value = '';
+  renderMoney();
+  toast('已记录');
+});
+
+function renderMoney() {
+  const list = loadMoney().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.createdAt - a.createdAt));
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  const monthItems = list.filter((x) => x.date.startsWith(thisMonth));
+  const income = monthItems.filter((x) => x.type === 'income').reduce((s, x) => s + x.amount, 0);
+  const expense = monthItems.filter((x) => x.type === 'expense').reduce((s, x) => s + x.amount, 0);
+  $('#moneyIncome').textContent = income.toFixed(2);
+  $('#moneyExpense').textContent = expense.toFixed(2);
+  $('#moneyBalance').textContent = (income - expense).toFixed(2);
+
+  const ul = $('#moneyList');
+  ul.innerHTML = '';
+  list.slice(0, 50).forEach((item, idx) => {
+    const li = document.createElement('li');
+    li.className = 'money-item';
+    li.style.setProperty('--i', String(Math.min(idx, 8)));
+
+    const amount = document.createElement('span');
+    amount.className = 'amount ' + item.type;
+    amount.textContent = (item.type === 'income' ? '+' : '-') + item.amount.toFixed(2);
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    const note = document.createElement('div');
+    note.className = 'note';
+    note.textContent = item.note || (item.type === 'income' ? '收入' : '支出');
+    const date = document.createElement('div');
+    date.className = 'date';
+    date.textContent = item.date.replace(/-/g, '/');
+    info.appendChild(note);
+    info.appendChild(date);
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.setAttribute('aria-label', '删除这笔');
+    del.innerHTML = trashIcon();
+    del.addEventListener('click', () => {
+      store.set(KEY_MONEY, loadMoney().filter((x) => x.id !== item.id));
+      renderMoney();
+    });
+
+    li.appendChild(amount);
+    li.appendChild(info);
+    li.appendChild(del);
+    ul.appendChild(li);
+  });
+
+  $('#moneyEmpty').hidden = list.length > 0;
+  ul.hidden = list.length === 0;
+}
+
+/* ========================================================
+   心情日记
+   ======================================================== */
+const MOOD_OPTIONS = [
+  { emoji: '😄', label: '开心' },
+  { emoji: '😊', label: '平静' },
+  { emoji: '😐', label: '一般' },
+  { emoji: '😔', label: '低落' },
+  { emoji: '😡', label: '生气' }
+];
+let selectedMood = null;
+
+function loadMoods() {
+  const list = store.get(KEY_MOOD, []);
+  return Array.isArray(list) ? list : [];
+}
+
+function renderMoodEmojis(preselected) {
+  const box = $('#moodEmojis');
+  box.innerHTML = '';
+  MOOD_OPTIONS.forEach((opt) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mood-emoji' + (opt.emoji === preselected ? ' active' : '');
+    btn.textContent = opt.emoji;
+    btn.setAttribute('aria-label', opt.label);
+    btn.addEventListener('click', () => {
+      selectedMood = opt.emoji;
+      $$('.mood-emoji').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+    box.appendChild(btn);
+  });
+}
+
+$('#moodSave').addEventListener('click', () => {
+  const text = $('#moodText').value.trim();
+  if (!selectedMood && !text) {
+    toast('选个心情或者写句话');
+    return;
+  }
+  const today = dateKey();
+  const list = loadMoods();
+  const existing = list.find((x) => x.date === today);
+  if (existing) {
+    existing.mood = selectedMood || existing.mood;
+    existing.text = text;
+  } else {
+    list.push({ date: today, mood: selectedMood || '', text });
+  }
+  store.set(KEY_MOOD, list);
+  selectedMood = null;
+  $('#moodText').value = '';
+  renderMood();
+  toast('已保存');
+});
+
+function renderMood() {
+  const list = loadMoods().sort((a, b) => (a.date < b.date ? 1 : -1));
+  const today = list.find((x) => x.date === dateKey());
+
+  $('#moodTodayLabel').textContent = today ? '今天（已有记录，可覆盖）' : '今天';
+  selectedMood = today ? today.mood : null;
+  $('#moodText').value = today ? today.text || '' : '';
+  renderMoodEmojis(today ? today.mood : null);
+
+  const stats = $('#moodStats');
+  stats.innerHTML = '';
+  if (list.length) {
+    const counts = {};
+    list.forEach((x) => { if (x.mood) counts[x.mood] = (counts[x.mood] || 0) + 1; });
+    Object.entries(counts).sort((a, b) => b[1] - a[1]).forEach(([emoji, n]) => {
+      const span = document.createElement('span');
+      span.className = 'chip';
+      span.textContent = `${emoji} ${n} 次`;
+      stats.appendChild(span);
+    });
+  }
+
+  const ul = $('#moodList');
+  ul.innerHTML = '';
+  list.slice(0, 30).forEach((item, idx) => {
+    const li = document.createElement('li');
+    li.className = 'mood-item';
+    li.style.setProperty('--i', String(Math.min(idx, 8)));
+
+    const mood = document.createElement('span');
+    mood.className = 'mood';
+    mood.textContent = item.mood || '📝';
+
+    const body = document.createElement('div');
+    body.className = 'body';
+    const date = document.createElement('div');
+    date.className = 'date';
+    date.textContent = item.date.replace(/-/g, '/');
+    body.appendChild(date);
+    if (item.text) {
+      const text = document.createElement('div');
+      text.className = 'text';
+      text.textContent = item.text;
+      body.appendChild(text);
+    }
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.setAttribute('aria-label', '删除这条心情');
+    del.innerHTML = trashIcon();
+    del.addEventListener('click', () => {
+      store.set(KEY_MOOD, loadMoods().filter((x) => x.date !== item.date));
+      renderMood();
+    });
+
+    li.appendChild(mood);
+    li.appendChild(body);
+    li.appendChild(del);
+    ul.appendChild(li);
+  });
+
+  $('#moodEmpty').hidden = list.length > 0;
   ul.hidden = list.length === 0;
 }
 

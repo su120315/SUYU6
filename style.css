@@ -784,9 +784,127 @@ input[type="date"].input { width: 148px; padding-right: 8px; }
 .btn.danger { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
 .file-btn { display: inline-flex; align-items: center; cursor: pointer; }
 
+/* ---------- 日历 ---------- */
+.cal-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px; }
+.cal-title { font-size: 18px; font-weight: 700; }
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 14px; }
+.cal-cell {
+  aspect-ratio: 1 / 1.1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4px 2px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  font-size: 12px;
+  position: relative;
+  transition: border-color .15s, background .15s;
+}
+.cal-cell.other { opacity: .35; }
+.cal-cell.today { border-color: var(--primary); background: var(--primary-soft); font-weight: 700; }
+.cal-cell.selected { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.cal-dots { display: flex; gap: 2px; margin-top: 3px; flex-wrap: wrap; justify-content: center; }
+.cal-dots i {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+  display: block;
+}
+.cal-dots i.hw { background: #f97316; }
+.cal-dots i.exam { background: var(--danger); }
+.cal-dots i.duty { background: #8b5cf6; }
+.cal-detail { padding: 14px 16px; }
+.cal-detail-body { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.cal-detail-item { font-size: 14px; display: flex; align-items: center; gap: 8px; }
+
+/* ---------- 单词本 ---------- */
+.word-review { padding: 24px; text-align: center; margin-bottom: 14px; }
+.word-card-term { font-size: 28px; font-weight: 700; margin: 0 0 8px; word-break: break-word; }
+.word-card-def { font-size: 18px; color: var(--primary); margin: 0 0 16px; animation: popIn .25s ease both; }
+.word-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.word-item.known { opacity: .55; }
+.word-item .term { font-weight: 600; min-width: 80px; }
+.word-item .def { flex: 1 1 auto; color: var(--muted); font-size: 13px; word-break: break-word; }
+.word-item .del { flex: 0 0 auto; }
+
+/* ---------- 便签墙 ---------- */
+.note-wall { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.note-card {
+  padding: 14px 14px 30px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  position: relative;
+  min-height: 110px;
+  animation: itemIn .3s ease both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+.note-card h4 { margin: 0 0 6px; font-size: 15px; word-break: break-word; }
+.note-card p { margin: 0; font-size: 13px; line-height: 1.5; word-break: break-word; white-space: pre-wrap; }
+.note-card .del {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: transparent;
+  border: none;
+  color: rgba(0, 0, 0, .4);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.note-card:hover .del { opacity: 1; }
+
+/* ---------- 记账 ---------- */
+.money-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.money-card { padding: 12px 8px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; text-align: center; }
+.money-card span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.money-card b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.money-card.income b { color: var(--ok); }
+.money-card.expense b { color: var(--danger); }
+.money-card.balance b { color: var(--primary); }
+.money-type { display: flex; gap: 14px; align-items: center; font-size: 14px; padding: 0 2px; }
+.money-type label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.money-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.money-item .amount { font-size: 17px; font-weight: 700; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.money-item .amount.income { color: var(--ok); }
+.money-item .amount.expense { color: var(--danger); }
+.money-item .info { flex: 1 1 auto; min-width: 0; }
+.money-item .info .note { font-size: 14px; word-break: break-word; }
+.money-item .info .date { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+/* ---------- 心情日记 ---------- */
+.mood-today { padding: 18px; margin-bottom: 14px; }
+.mood-today textarea { margin: 10px 0 12px; resize: vertical; }
+.mood-emojis { display: flex; gap: 10px; justify-content: center; margin: 10px 0; }
+.mood-emoji {
+  font-size: 30px;
+  width: 52px; height: 52px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--card-2);
+  cursor: pointer;
+  transition: transform .15s, border-color .15s;
+}
+.mood-emoji.active { border-color: var(--primary); transform: scale(1.12); }
+.mood-emoji:active { transform: scale(.9); }
+.mood-stats { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.mood-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.mood-item .mood { font-size: 26px; flex: 0 0 auto; }
+.mood-item .body { flex: 1 1 auto; min-width: 0; }
+.mood-item .date { font-size: 12px; color: var(--muted); }
+.mood-item .text { font-size: 14px; margin-top: 3px; word-break: break-word; white-space: pre-wrap; }
+
 /* ---------- 大屏 ---------- */
 @media (min-width: 720px) {
-  body { padding-bottom: 24px; }
   .duty-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .mistake-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .tabbar {
