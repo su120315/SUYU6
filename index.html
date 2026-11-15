@@ -4,20 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#4f7cff">
-<meta name="description" content="班级学习工具箱：作业清单、值日表、考试倒计时、错题整理，一个页面全搞定，数据存在本机。">
+<meta name="description" content="班级学习工具箱：作业、课程表、考试倒计时、值日、错题复习、番茄钟、成绩记录、习惯打卡，数据只存在本机。">
 <title>班级学习工具箱</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎒</text></svg>">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
 <header class="topbar">
   <div class="topbar-inner">
+    <button class="icon-btn back-btn" id="backBtn" type="button" aria-label="返回首页" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
     <div class="brand">
       <span class="brand-logo">🎒</span>
       <div>
-        <h1>班级学习工具箱</h1>
+        <h1 id="viewTitle">班级学习工具箱</h1>
         <p class="brand-sub" id="todayText">今天</p>
       </div>
     </div>
@@ -29,8 +32,81 @@
 
 <main class="wrap">
 
+  <!-- ========== 首页 ========== -->
+  <section class="view" id="view-home">
+    <div class="card hero">
+      <p class="hero-hi" id="heroHi">你好</p>
+      <p class="hero-sub" id="heroTip">今天也要加油。</p>
+      <div class="hero-progress"><span id="heroProgressBar"></span></div>
+      <p class="hero-progress-text" id="heroProgressText"></p>
+    </div>
+
+    <div class="stat-grid">
+      <button class="stat-card" data-go="homework" type="button">
+        <span class="stat-num" id="statHw">0</span>
+        <span class="stat-label">待写作业</span>
+      </button>
+      <button class="stat-card" data-go="review" type="button">
+        <span class="stat-num" id="statReview">0</span>
+        <span class="stat-label">待复习错题</span>
+      </button>
+      <button class="stat-card" data-go="exam" type="button">
+        <span class="stat-num" id="statExam">—</span>
+        <span class="stat-label" id="statExamLabel">最近考试</span>
+      </button>
+      <button class="stat-card" data-go="focus" type="button">
+        <span class="stat-num" id="statFocus">0</span>
+        <span class="stat-label">今日专注 / 分钟</span>
+      </button>
+    </div>
+
+    <div class="card today-card">
+      <div class="card-head">
+        <h3>今天</h3>
+        <span class="muted" id="todayDuty">值日：未安排</span>
+      </div>
+      <div class="today-classes" id="todayClasses"></div>
+    </div>
+
+    <h3 class="section-title">全部功能</h3>
+    <div class="feature-grid">
+      <button class="feature" data-go="homework" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M14 3v6h6"/></svg>
+        <span>作业清单</span><em>记下要交的</em>
+      </button>
+      <button class="feature" data-go="schedule" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 4V2m8 2V2"/></svg>
+        <span>课程表</span><em>今天上什么</em>
+      </button>
+      <button class="feature" data-go="exam" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
+        <span>考试倒计时</span><em>心里有数</em>
+      </button>
+      <button class="feature" data-go="duty" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V9l7-6 7 6v12"/><path d="M9 21v-7h6v7"/></svg>
+        <span>值日表</span><em>轮到谁了</em>
+      </button>
+      <button class="feature" data-go="mistake" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3Z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span>错题本</span><em>拍照记下来</em>
+      </button>
+      <button class="feature" data-go="review" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
+        <span>错题复习</span><em>遗忘曲线</em>
+      </button>
+      <button class="feature" data-go="grades" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10m6 10V4m6 16v-7"/><path d="M2 20h20"/></svg>
+        <span>成绩记录</span><em>看看进步没</em>
+      </button>
+      <button class="feature" data-go="habit" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21c-4 0-7-3-7-7 0-5 7-11 7-11s7 6 7 11c0 4-3 7-7 7Z"/><path d="M9 14l2 2 4-4"/></svg>
+        <span>习惯打卡</span><em>每天坚持</em>
+      </button>
+    </div>
+  </section>
+
   <!-- ========== 作业 ========== -->
-  <section class="panel" id="panel-homework">
+  <section class="view" id="view-homework" hidden>
     <div class="panel-head">
       <h2>作业清单</h2>
       <p class="panel-desc">记下要交的作业，做完划掉。</p>
@@ -61,8 +137,20 @@
     </div>
   </section>
 
+  <!-- ========== 课程表 ========== -->
+  <section class="view" id="view-schedule" hidden>
+    <div class="panel-head">
+      <h2>课程表</h2>
+      <p class="panel-desc">选星期几，按顺序填课，自动保存。</p>
+    </div>
+    <div class="week-switch" id="scheduleWeek"></div>
+    <div class="schedule-day" id="scheduleDay"></div>
+    <button class="btn add-line" id="scheduleAdd" type="button">+ 加一节课</button>
+    <p class="hint">今天会上：<strong id="scheduleTodayText">—</strong></p>
+  </section>
+
   <!-- ========== 值日 ========== -->
-  <section class="panel" id="panel-duty" hidden>
+  <section class="view" id="view-duty" hidden>
     <div class="panel-head">
       <h2>值日表</h2>
       <p class="panel-desc">点一下就能改，谁值日一目了然。</p>
@@ -72,7 +160,7 @@
   </section>
 
   <!-- ========== 考试 ========== -->
-  <section class="panel" id="panel-exam" hidden>
+  <section class="view" id="view-exam" hidden>
     <div class="panel-head">
       <h2>考试倒计时</h2>
       <p class="panel-desc">离考试还有几天，心里有个数。</p>
@@ -94,7 +182,7 @@
   </section>
 
   <!-- ========== 错题 ========== -->
-  <section class="panel" id="panel-mistake" hidden>
+  <section class="view" id="view-mistake" hidden>
     <div class="panel-head">
       <h2>错题本</h2>
       <p class="panel-desc">拍下题目，写上错因，考前翻一翻。</p>
@@ -121,14 +209,13 @@
   </section>
 
   <!-- ========== 复习 ========== -->
-  <section class="panel" id="panel-review" hidden>
+  <section class="view" id="view-review" hidden>
     <div class="panel-head">
       <h2>错题复习</h2>
       <p class="panel-desc">按遗忘曲线提醒，复习一次就往后推几天。</p>
     </div>
 
     <div class="stats" id="reviewStats"></div>
-
     <div class="review-stage" id="reviewStage"></div>
 
     <div class="review-done" id="reviewDone" hidden>
@@ -139,41 +226,153 @@
 
     <div class="empty" id="reviewEmpty" hidden>
       <span class="empty-emoji">🌱</span>
-      <p>还没有错题。先去「错题」标签记一道。</p>
+      <p>还没有错题。先去「错题本」记一道。</p>
+    </div>
+  </section>
+
+  <!-- ========== 专注 ========== -->
+  <section class="view" id="view-focus" hidden>
+    <div class="panel-head">
+      <h2>专注计时</h2>
+      <p class="panel-desc">定个时间，专心做完一件事。</p>
+    </div>
+
+    <div class="card focus-card">
+      <div class="focus-modes" id="focusModes">
+        <button type="button" data-min="15">15 分钟</button>
+        <button type="button" data-min="25" class="active">25 分钟</button>
+        <button type="button" data-min="45">45 分钟</button>
+      </div>
+
+      <div class="focus-ring">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="ring-bg" cx="100" cy="100" r="86"/>
+          <circle class="ring-fg" id="ringFg" cx="100" cy="100" r="86"/>
+        </svg>
+        <div class="focus-time">
+          <span id="focusTime">25:00</span>
+          <em id="focusState">准备开始</em>
+        </div>
+      </div>
+
+      <div class="focus-actions">
+        <button class="btn primary" id="focusToggle" type="button">开始专注</button>
+        <button class="btn ghost" id="focusReset" type="button">重置</button>
+      </div>
+    </div>
+
+    <div class="stats" id="focusStats"></div>
+    <ul class="list" id="focusLog"></ul>
+  </section>
+
+  <!-- ========== 成绩 ========== -->
+  <section class="view" id="view-grades" hidden>
+    <div class="panel-head">
+      <h2>成绩记录</h2>
+      <p class="panel-desc">每次考试记一笔，看看自己是不是在进步。</p>
+    </div>
+
+    <form class="card form" id="gradeForm" autocomplete="off">
+      <div class="row">
+        <input class="input" id="gradeSubject" list="subjectList" placeholder="科目" maxlength="12" required>
+        <input class="input grow" id="gradeName" placeholder="考试名称，如：期中" maxlength="20" required>
+      </div>
+      <div class="row">
+        <input class="input" id="gradeScore" type="number" min="0" step="0.5" placeholder="得分" required>
+        <input class="input" id="gradeFull" type="number" min="1" step="1" placeholder="满分" value="100" required>
+        <input class="input" id="gradeDate" type="date" required aria-label="考试日期">
+        <button class="btn primary" type="submit">添加</button>
+      </div>
+    </form>
+
+    <div class="stats" id="gradeStats"></div>
+    <div class="card chart-card" id="chartCard" hidden>
+      <h3>得分率走势</h3>
+      <canvas id="gradeChart" height="180"></canvas>
+    </div>
+    <ul class="list" id="gradeList"></ul>
+    <div class="empty" id="gradeEmpty" hidden>
+      <span class="empty-emoji">📈</span>
+      <p>还没有成绩记录。</p>
+    </div>
+  </section>
+
+  <!-- ========== 打卡 ========== -->
+  <section class="view" id="view-habit" hidden>
+    <div class="panel-head">
+      <h2>习惯打卡</h2>
+      <p class="panel-desc">背单词、阅读、运动，每天坚持一点点。</p>
+    </div>
+
+    <form class="card form" id="habitForm" autocomplete="off">
+      <div class="row">
+        <input class="input grow" id="habitName" placeholder="比如：背 20 个单词" maxlength="20" required>
+        <button class="btn primary" type="submit">添加</button>
+      </div>
+    </form>
+
+    <ul class="list" id="habitList"></ul>
+    <div class="empty" id="habitEmpty" hidden>
+      <span class="empty-emoji">🌱</span>
+      <p>先添加一个想坚持的习惯。</p>
+    </div>
+  </section>
+
+  <!-- ========== 设置 ========== -->
+  <section class="view" id="view-settings" hidden>
+    <div class="panel-head">
+      <h2>我的</h2>
+      <p class="panel-desc">数据都在你自己的浏览器里，记得定期备份。</p>
+    </div>
+
+    <div class="card settings-card">
+      <h3>数据备份</h3>
+      <p class="muted">导出成一个文件，换手机或清缓存前用得上。</p>
+      <div class="row">
+        <button class="btn primary" id="exportData" type="button">导出全部数据</button>
+        <label class="btn ghost file-btn">
+          导入备份
+          <input type="file" id="importData" accept="application/json,.json" hidden>
+        </label>
+      </div>
+    </div>
+
+    <div class="card settings-card">
+      <h3>更多</h3>
+      <a class="settings-link" href="home/">学生主页生成器 →</a>
+      <p class="muted">版本 v3 · 纯静态网页，无需注册，离线可用。</p>
+    </div>
+
+    <div class="card settings-card danger-zone">
+      <h3>清空数据</h3>
+      <p class="muted">删掉本机上的全部记录，不可恢复。</p>
+      <button class="btn danger" id="wipeData" type="button">全部清空</button>
     </div>
   </section>
 
 </main>
 
-<nav class="tabbar" aria-label="功能导航">
-  <button class="tab active" data-tab="homework" type="button">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M14 3v6h6"/></svg>
-    <span>作业</span>
+<nav class="tabbar" aria-label="主导航">
+  <button class="tab active" data-tab="home" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 10v11h14V10"/></svg>
+    <span>首页</span>
   </button>
-  <button class="tab" data-tab="duty" type="button">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V9l7-6 7 6v12"/><path d="M9 21v-7h6v7"/></svg>
-    <span>值日</span>
+  <button class="tab" data-tab="focus" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <span>专注</span>
   </button>
-  <button class="tab" data-tab="exam" type="button">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>
-    <span>考试</span>
-  </button>
-  <button class="tab" data-tab="mistake" type="button">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3Z"/><circle cx="12" cy="13" r="3.5"/></svg>
-    <span>错题</span>
-  </button>
-  <button class="tab" data-tab="review" type="button">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
-    <span>复习</span>
+  <button class="tab" data-tab="settings" type="button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+    <span>我的</span>
   </button>
 </nav>
 
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-
 <footer class="site-foot">
-  <a href="home/">学生主页生成器 →</a>
+  数据只保存在本机 · <a href="home/">学生主页生成器 →</a>
 </footer>
 
-<script src="app.js?v=2" defer></script>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js?v=3" defer></script>
 </body>
 </html>

@@ -14,7 +14,6 @@ function dateKey(d = new Date()) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-/** 今天零点的时间戳 */
 function todayStart() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -24,8 +23,7 @@ function todayStart() {
 /** "2026-11-20" -> 距今天数（今天=0，昨天=-1） */
 function daysFromToday(key) {
   const [y, m, d] = key.split('-').map(Number);
-  const target = new Date(y, m - 1, d).getTime();
-  return Math.round((target - todayStart()) / 86400000);
+  return Math.round((new Date(y, m - 1, d).getTime() - todayStart()) / 86400000);
 }
 
 function formatCN(key) {
@@ -40,6 +38,10 @@ function toast(msg) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /* ============ 本地存储 ============ */
@@ -68,8 +70,14 @@ const store = {
 const KEY_HW = 'ct.homework';
 const KEY_DUTY = 'ct.duty';
 const KEY_EXAM = 'ct.exams';
+const KEY_SCHEDULE = 'ct.schedule';
+const KEY_FOCUS = 'ct.focus';
+const KEY_GRADES = 'ct.grades';
+const KEY_HABITS = 'ct.habits';
+const BACKUP_KEYS = [KEY_HW, KEY_DUTY, KEY_EXAM, KEY_SCHEDULE, KEY_FOCUS, KEY_GRADES, KEY_HABITS, 'ct.theme', 'ct.homepage'];
 
 const WEEK = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+const todayWeekIndex = () => (new Date().getDay() + 6) % 7;
 
 /* ============ 主题 ============ */
 (function initTheme() {
@@ -81,28 +89,131 @@ const WEEK = ['周一', '周二', '周三', '周四', '周五', '周六', '周�
     const dark = document.body.classList.toggle('dark');
     localStorage.setItem('ct.theme', dark ? 'dark' : 'light');
     document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#0e1320' : '#4f7cff');
+    if (currentView === 'grades') drawGradeChart();
   });
 })();
 
-/* ============ 顶部日期 ============ */
-(function initToday() {
+$('#todayText').textContent = (() => {
   const d = new Date();
-  $('#todayText').textContent = `${d.getMonth() + 1}月${d.getDate()}日 ${WEEK[(d.getDay() + 6) % 7]}`;
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${WEEK[todayWeekIndex()]}`;
 })();
 
-/* ============ 底部导航 ============ */
-$$('.tab').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    const tab = btn.dataset.tab;
-    $$('.tab').forEach((b) => b.classList.toggle('active', b === btn));
-    $$('.panel').forEach((p) => { p.hidden = p.id !== `panel-${tab}`; });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    if (tab === 'duty') renderDuty();
-    if (tab === 'exam') renderExams();
-    if (tab === 'mistake') renderMistakes();
-    if (tab === 'review') renderReview();
-  });
+/* ========================================================
+   视图路由（hash 驱动，浏览器返回键可用）
+   ======================================================== */
+const VIEW_TITLES = {
+  home: '班级学习工具箱',
+  homework: '作业清单',
+  schedule: '课程表',
+  duty: '值日表',
+  exam: '考试倒计时',
+  mistake: '错题本',
+  review: '错题复习',
+  focus: '专注计时',
+  grades: '成绩记录',
+  habit: '习惯打卡',
+  settings: '我的'
+};
+let currentView = 'home';
+
+function go(name) {
+  if (!VIEW_TITLES[name]) name = 'home';
+  const hash = '#/' + name;
+  if (location.hash === hash) show(name);
+  else location.hash = hash;
+}
+
+function show(name) {
+  if (!VIEW_TITLES[name]) name = 'home';
+  currentView = name;
+  $$('.view').forEach((v) => { v.hidden = v.id !== 'view-' + name; });
+  $('#viewTitle').textContent = VIEW_TITLES[name];
+  $('#backBtn').hidden = name === 'home';
+  const activeTab = (name === 'focus' || name === 'settings') ? name : 'home';
+  $$('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === activeTab));
+  window.scrollTo({ top: 0 });
+
+  if (name === 'home') renderHome();
+  if (name === 'homework') renderHomework();
+  if (name === 'schedule') renderSchedule();
+  if (name === 'duty') renderDuty();
+  if (name === 'exam') renderExams();
+  if (name === 'mistake') renderMistakes();
+  if (name === 'review') renderReview();
+  if (name === 'grades') renderGrades();
+  if (name === 'habit') renderHabits();
+  if (name === 'focus') renderFocusStats();
+}
+
+window.addEventListener('hashchange', () => {
+  show(location.hash.replace(/^#\//, '') || 'home');
 });
+
+$$('[data-go]').forEach((el) => {
+  el.addEventListener('click', () => go(el.dataset.go));
+});
+$$('.feature').forEach((el, i) => el.style.setProperty('--i', String(i)));
+$$('.tab').forEach((btn) => btn.addEventListener('click', () => go(btn.dataset.tab)));
+$('#backBtn').addEventListener('click', () => go('home'));
+
+/* ========================================================
+   首页仪表盘
+   ======================================================== */
+async function renderHome() {
+  const hour = new Date().getHours();
+  $('#heroHi').textContent = hour < 6 ? '夜深了' : hour < 9 ? '早上好' : hour < 12 ? '上午好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好';
+
+  const hw = loadHomework();
+  const undone = hw.filter((x) => !x.done).length;
+  const donePct = hw.length ? Math.round(((hw.length - undone) / hw.length) * 100) : 0;
+  $('#heroProgressBar').style.width = donePct + '%';
+  $('#heroProgressText').textContent = hw.length
+    ? `作业完成 ${donePct}% · 共 ${hw.length} 项`
+    : '还没有作业，去「作业清单」加一条。';
+
+  let dueReview = 0;
+  try {
+    const all = await dbAll();
+    const today = dateKey();
+    dueReview = all.filter((x) => reviewState(x).next <= today).length;
+  } catch (e) { /* 忽略，首页只是概览 */ }
+
+  $('#heroTip').textContent = undone || dueReview
+    ? `今天还有 ${undone} 项作业、${dueReview} 道错题要复习。`
+    : '今天的任务都清空了，去专注一会儿吧。';
+
+  $('#statHw').textContent = String(undone);
+  $('#statReview').textContent = String(dueReview);
+
+  const upcoming = loadExams()
+    .map((x) => ({ ...x, diff: daysFromToday(x.date) }))
+    .filter((x) => x.diff >= 0)
+    .sort((a, b) => a.diff - b.diff)[0];
+  $('#statExam').textContent = upcoming ? String(upcoming.diff) : '—';
+  $('#statExamLabel').textContent = upcoming ? `${upcoming.name} / 天后` : '最近考试';
+
+  $('#statFocus').textContent = String(focusLog().filter((x) => x.date === dateKey()).reduce((s, x) => s + x.minutes, 0));
+
+  const duty = loadDuty();
+  $('#todayDuty').textContent = '值日：' + (duty.days[todayWeekIndex()] || '未安排');
+
+  const classes = loadSchedule().days[todayWeekIndex()].filter(Boolean);
+  const box = $('#todayClasses');
+  box.innerHTML = '';
+  if (!classes.length) {
+    const span = document.createElement('span');
+    span.className = 'muted';
+    span.textContent = '今天还没排课，去「课程表」填一下。';
+    box.appendChild(span);
+  } else {
+    classes.forEach((name) => {
+      const tag = document.createElement('span');
+      tag.className = 'subject-tag';
+      tag.textContent = name;
+      box.appendChild(tag);
+    });
+  }
+}
 
 /* ========================================================
    作业清单
@@ -113,10 +224,6 @@ const hwList = $('#hwList');
 function loadHomework() {
   const list = store.get(KEY_HW, []);
   return Array.isArray(list) ? list : [];
-}
-
-function saveHomework(list) {
-  store.set(KEY_HW, list);
 }
 
 hwForm.addEventListener('submit', (e) => {
@@ -132,26 +239,21 @@ hwForm.addEventListener('submit', (e) => {
     done: false,
     createdAt: Date.now()
   });
-  saveHomework(list);
+  store.set(KEY_HW, list);
   $('#hwTitle').value = '';
   renderHomework();
   toast('已添加');
 });
 
-function sortHomework(list) {
+function renderHomework() {
   const today = dateKey();
-  return list.slice().sort((a, b) => {
+  const list = loadHomework().slice().sort((a, b) => {
     if (a.done !== b.done) return a.done ? 1 : -1;
-    const ad = a.due || '9999-99-99';
-    const bd = b.due || '9999-99-99';
+    const ad = a.due || '9999';
+    const bd = b.due || '9999';
     if (ad !== bd) return ad < bd ? -1 : 1;
     return a.createdAt - b.createdAt;
   });
-}
-
-function renderHomework() {
-  const list = sortHomework(loadHomework());
-  const today = dateKey();
 
   const undone = list.filter((x) => !x.done).length;
   const dueToday = list.filter((x) => !x.done && x.due === today).length;
@@ -159,12 +261,11 @@ function renderHomework() {
 
   $('#hwStats').innerHTML = '';
   if (list.length) {
-    const chips = [
+    [
       { text: `未完成 ${undone}`, cls: undone ? '' : 'done' },
       { text: `今天到期 ${dueToday}`, cls: dueToday ? 'urgent' : '' },
       { text: `已完成 ${doneCount}`, cls: 'done' }
-    ];
-    chips.forEach((c) => {
+    ].forEach((c) => {
       const span = document.createElement('span');
       span.className = 'chip' + (c.cls ? ' ' + c.cls : '');
       span.textContent = c.text;
@@ -195,7 +296,7 @@ function renderHomework() {
       const target = arr.find((x) => x.id === item.id);
       if (target) {
         target.done = !target.done;
-        saveHomework(arr);
+        store.set(KEY_HW, arr);
         renderHomework();
       }
     });
@@ -218,20 +319,11 @@ function renderHomework() {
     if (item.due) {
       const due = document.createElement('span');
       const diff = daysFromToday(item.due);
-      if (item.done) {
-        due.textContent = formatCN(item.due);
-      } else if (diff < 0) {
-        due.textContent = `逾期 ${-diff} 天`;
-        due.className = 'due-bad';
-      } else if (diff === 0) {
-        due.textContent = '今天截止';
-        due.className = 'due-bad';
-      } else if (diff === 1) {
-        due.textContent = '明天截止';
-        due.className = 'due-bad';
-      } else {
-        due.textContent = `${formatCN(item.due)}截止（${diff} 天后）`;
-      }
+      if (item.done) due.textContent = formatCN(item.due);
+      else if (diff < 0) { due.textContent = `逾期 ${-diff} 天`; due.className = 'due-bad'; }
+      else if (diff === 0) { due.textContent = '今天截止'; due.className = 'due-bad'; }
+      else if (diff === 1) { due.textContent = '明天截止'; due.className = 'due-bad'; }
+      else due.textContent = `${formatCN(item.due)}截止（${diff} 天后）`;
       meta.appendChild(due);
     }
 
@@ -242,9 +334,9 @@ function renderHomework() {
     del.type = 'button';
     del.className = 'del';
     del.setAttribute('aria-label', '删除这条作业');
-    del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>';
+    del.innerHTML = trashIcon();
     del.addEventListener('click', () => {
-      saveHomework(loadHomework().filter((x) => x.id !== item.id));
+      store.set(KEY_HW, loadHomework().filter((x) => x.id !== item.id));
       renderHomework();
       toast('已删除');
     });
@@ -259,6 +351,113 @@ function renderHomework() {
   hwList.hidden = list.length === 0;
 }
 
+function trashIcon() {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>';
+}
+
+/* ========================================================
+   课程表
+   ======================================================== */
+let scheduleIndex = todayWeekIndex();
+
+function loadSchedule() {
+  const data = store.get(KEY_SCHEDULE, null);
+  if (data && Array.isArray(data.days) && data.days.length === 7) {
+    data.days = data.days.map((d) => (Array.isArray(d) ? d : []));
+    return data;
+  }
+  return { days: Array.from({ length: 7 }, () => []) };
+}
+
+function saveSchedule(data) {
+  store.set(KEY_SCHEDULE, data);
+}
+
+function renderSchedule() {
+  const week = $('#scheduleWeek');
+  week.innerHTML = '';
+  WEEK.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = name.replace('周', '');
+    btn.className = (i === scheduleIndex ? 'active' : '') + (i === todayWeekIndex() ? ' today' : '');
+    btn.setAttribute('aria-label', name);
+    btn.addEventListener('click', () => {
+      scheduleIndex = i;
+      renderSchedule();
+    });
+    week.appendChild(btn);
+  });
+
+  const data = loadSchedule();
+  const list = data.days[scheduleIndex];
+  const day = $('#scheduleDay');
+  day.innerHTML = '';
+
+  if (!list.length) {
+    const empty = document.createElement('p');
+    empty.className = 'hint';
+    empty.textContent = `${WEEK[scheduleIndex]}还没排课，点下面「加一节课」。`;
+    day.appendChild(empty);
+  }
+
+  list.forEach((subject, i) => {
+    const row = document.createElement('div');
+    row.className = 'schedule-row';
+    row.style.setProperty('--i', String(Math.min(i, 8)));
+
+    const no = document.createElement('span');
+    no.className = 'no';
+    no.textContent = `第 ${i + 1} 节`;
+
+    const input = document.createElement('input');
+    input.className = 'input';
+    input.value = subject;
+    input.placeholder = '课程名称';
+    input.maxLength = 12;
+    input.setAttribute('aria-label', `${WEEK[scheduleIndex]}第${i + 1}节`);
+    input.addEventListener('change', () => {
+      const cur = loadSchedule();
+      cur.days[scheduleIndex][i] = input.value.trim();
+      saveSchedule(cur);
+      renderScheduleTodayText();
+    });
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.setAttribute('aria-label', '删除这节课');
+    del.innerHTML = trashIcon();
+    del.addEventListener('click', () => {
+      const cur = loadSchedule();
+      cur.days[scheduleIndex].splice(i, 1);
+      saveSchedule(cur);
+      renderSchedule();
+    });
+
+    row.appendChild(no);
+    row.appendChild(input);
+    row.appendChild(del);
+    day.appendChild(row);
+  });
+
+  renderScheduleTodayText();
+}
+
+function renderScheduleTodayText() {
+  const classes = loadSchedule().days[todayWeekIndex()].filter(Boolean);
+  $('#scheduleTodayText').textContent = classes.length ? classes.join('、') : '未安排';
+}
+
+$('#scheduleAdd').addEventListener('click', () => {
+  const cur = loadSchedule();
+  cur.days[scheduleIndex].push('');
+  saveSchedule(cur);
+  renderSchedule();
+  const inputs = $$('#scheduleDay .input');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+});
+
 /* ========================================================
    值日表
    ======================================================== */
@@ -272,7 +471,7 @@ function loadDuty() {
 
 function renderDuty() {
   const data = loadDuty();
-  const todayIndex = (new Date().getDay() + 6) % 7; // 周一=0
+  const todayIndex = todayWeekIndex();
   dutyGrid.innerHTML = '';
 
   data.days.forEach((value, i) => {
@@ -350,16 +549,9 @@ function renderExams() {
     count.className = 'exam-count';
     const num = document.createElement('b');
     const unit = document.createElement('span');
-    if (diff > 0) {
-      num.textContent = String(diff);
-      unit.textContent = '天后';
-    } else if (diff === 0) {
-      num.textContent = '今天';
-      unit.textContent = '就是这一天';
-    } else {
-      num.textContent = '已过';
-      unit.textContent = `${-diff} 天`;
-    }
+    if (diff > 0) { num.textContent = String(diff); unit.textContent = '天后'; }
+    else if (diff === 0) { num.textContent = '今天'; unit.textContent = '就是这一天'; }
+    else { num.textContent = '已过'; unit.textContent = `${-diff} 天`; }
     count.appendChild(num);
     count.appendChild(unit);
 
@@ -378,7 +570,7 @@ function renderExams() {
     del.type = 'button';
     del.className = 'del';
     del.setAttribute('aria-label', `删除考试 ${item.name}`);
-    del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>';
+    del.innerHTML = trashIcon();
     del.addEventListener('click', () => {
       if (!confirm(`删除「${item.name}」？`)) return;
       store.set(KEY_EXAM, loadExams().filter((x) => x.id !== item.id));
@@ -452,6 +644,16 @@ async function dbDelete(id) {
   });
 }
 
+async function dbClear() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 /** 压缩图片：最长边 1200px，JPEG 0.78，控制体积 */
 function compressImage(file) {
   return new Promise((resolve, reject) => {
@@ -469,8 +671,7 @@ function compressImage(file) {
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
       canvas.toBlob((blob) => {
         if (blob) resolve(blob);
         else reject(new Error('图片处理失败'));
@@ -583,7 +784,6 @@ async function renderMistakes() {
     list = await dbAll();
   } catch (err) {
     console.warn(err);
-    grid.innerHTML = '';
     const box = document.createElement('div');
     box.className = 'empty';
     box.innerHTML = '<span class="empty-emoji">⚠️</span><p>浏览器不允许本地存储图片，换个浏览器试试。</p>';
@@ -634,7 +834,7 @@ async function renderMistakes() {
     del.type = 'button';
     del.className = 'mistake-del';
     del.setAttribute('aria-label', '删除这道错题');
-    del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/></svg>';
+    del.innerHTML = trashIcon();
     del.addEventListener('click', async () => {
       if (!confirm('删除这道错题？')) return;
       await dbDelete(item.id);
@@ -654,7 +854,6 @@ async function renderMistakes() {
 /* ========================================================
    错题复习（遗忘曲线）
    ======================================================== */
-// 连续答对 1/2/3/4 次后分别隔 1/2/4/7 天，第 5 次算掌握，60 天后再见
 const REVIEW_INTERVALS = [1, 2, 4, 7, 15];
 const MASTER_DAYS = 60;
 const MASTER_LEVEL = 5;
@@ -665,10 +864,6 @@ function reviewState(item) {
     ? item.nextReview
     : dateKey(new Date(item.createdAt || Date.now()));
   return { level, next };
-}
-
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function renderReview() {
@@ -850,23 +1045,517 @@ async function gradeReview(id, ok) {
   else toast(`${days} 天后再复习`);
 
   await renderReview();
-  renderMistakes();
 }
+
+/* ========================================================
+   专注计时
+   ======================================================== */
+const RING_LEN = 540.35;
+const focus = { minutes: 25, remaining: 25 * 60, running: false, endAt: 0, timer: null };
+
+function focusLog() {
+  const data = store.get(KEY_FOCUS, { log: [] });
+  return Array.isArray(data.log) ? data.log : [];
+}
+
+function saveFocusLog(log) {
+  store.set(KEY_FOCUS, { log: log.slice(-200) });
+}
+
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function updateFocusUI() {
+  $('#focusTime').textContent = fmtTime(focus.remaining);
+  $('#ringFg').style.strokeDashoffset = String(RING_LEN * (1 - focus.remaining / (focus.minutes * 60)));
+  $('.focus-card').classList.toggle('running', focus.running);
+  $('#focusToggle').textContent = focus.running ? '暂停' : (focus.remaining < focus.minutes * 60 ? '继续' : '开始专注');
+}
+
+function focusTick() {
+  focus.remaining = Math.max(0, Math.round((focus.endAt - Date.now()) / 1000));
+  updateFocusUI();
+  if (focus.remaining <= 0) finishFocus();
+}
+
+function finishFocus() {
+  clearInterval(focus.timer);
+  focus.running = false;
+  const log = focusLog();
+  log.push({ date: dateKey(), minutes: focus.minutes, ts: Date.now() });
+  saveFocusLog(log);
+  focus.remaining = focus.minutes * 60;
+  $('#focusState').textContent = '完成了一次';
+  updateFocusUI();
+  renderFocusStats();
+  toast(`完成 ${focus.minutes} 分钟专注`);
+  if (navigator.vibrate) navigator.vibrate(200);
+}
+
+$('#focusToggle').addEventListener('click', () => {
+  if (focus.running) {
+    clearInterval(focus.timer);
+    focus.running = false;
+    $('#focusState').textContent = '已暂停';
+  } else {
+    focus.endAt = Date.now() + focus.remaining * 1000;
+    focus.timer = setInterval(focusTick, 250);
+    focus.running = true;
+    $('#focusState').textContent = '专注中';
+  }
+  updateFocusUI();
+});
+
+$('#focusReset').addEventListener('click', () => {
+  clearInterval(focus.timer);
+  focus.running = false;
+  focus.remaining = focus.minutes * 60;
+  $('#focusState').textContent = '准备开始';
+  updateFocusUI();
+});
+
+$$('#focusModes button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (focus.running) {
+      toast('先暂停再换时长');
+      return;
+    }
+    focus.minutes = Number(btn.dataset.min);
+    focus.remaining = focus.minutes * 60;
+    $$('#focusModes button').forEach((b) => b.classList.toggle('active', b === btn));
+    $('#focusState').textContent = '准备开始';
+    updateFocusUI();
+  });
+});
+
+function renderFocusStats() {
+  const log = focusLog();
+  const today = dateKey();
+  const weekStart = todayStart() - todayWeekIndex() * 86400000;
+  const todayMin = log.filter((x) => x.date === today).reduce((s, x) => s + x.minutes, 0);
+  const weekMin = log.filter((x) => x.ts >= weekStart).reduce((s, x) => s + x.minutes, 0);
+
+  const stats = $('#focusStats');
+  stats.innerHTML = '';
+  [
+    { text: `今日 ${todayMin} 分钟`, cls: todayMin ? 'done' : '' },
+    { text: `本周 ${weekMin} 分钟`, cls: '' },
+    { text: `累计 ${log.length} 次`, cls: '' }
+  ].forEach((c) => {
+    const span = document.createElement('span');
+    span.className = 'chip' + (c.cls ? ' ' + c.cls : '');
+    span.textContent = c.text;
+    stats.appendChild(span);
+  });
+
+  const list = $('#focusLog');
+  list.innerHTML = '';
+  log.slice(-5).reverse().forEach((item) => {
+    const li = document.createElement('li');
+    li.className = 'focus-log-item';
+    const left = document.createElement('span');
+    left.textContent = `${item.date.slice(5).replace('-', '月')}日`;
+    const right = document.createElement('b');
+    right.textContent = `${item.minutes} 分钟`;
+    li.appendChild(left);
+    li.appendChild(right);
+    list.appendChild(li);
+  });
+
+  updateFocusUI();
+}
+
+/* ========================================================
+   成绩记录
+   ======================================================== */
+function loadGrades() {
+  const list = store.get(KEY_GRADES, []);
+  return Array.isArray(list) ? list : [];
+}
+
+$('#gradeForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const subject = $('#gradeSubject').value.trim();
+  const name = $('#gradeName').value.trim();
+  const score = Number($('#gradeScore').value);
+  const full = Number($('#gradeFull').value);
+  const date = $('#gradeDate').value;
+  if (!subject || !name || !date || !full) return;
+  if (Number.isNaN(score) || score < 0) {
+    toast('分数不对');
+    return;
+  }
+  if (score > full) {
+    toast('得分不能超过满分');
+    return;
+  }
+  const list = loadGrades();
+  list.push({ id: uid(), subject, name, score, full, date });
+  store.set(KEY_GRADES, list);
+  $('#gradeName').value = '';
+  $('#gradeScore').value = '';
+  renderGrades();
+  toast('已记录');
+});
+
+function renderGrades() {
+  const list = loadGrades().sort((a, b) => (a.date < b.date ? 1 : -1));
+  const stats = $('#gradeStats');
+  stats.innerHTML = '';
+
+  if (list.length) {
+    const avg = list.reduce((s, x) => s + (x.score / x.full) * 100, 0) / list.length;
+    [
+      { text: `平均得分率 ${avg.toFixed(1)}%`, cls: avg >= 60 ? 'done' : 'urgent' },
+      { text: `共 ${list.length} 次记录`, cls: '' }
+    ].forEach((c) => {
+      const span = document.createElement('span');
+      span.className = 'chip' + (c.cls ? ' ' + c.cls : '');
+      span.textContent = c.text;
+      stats.appendChild(span);
+    });
+  }
+
+  $('#chartCard').hidden = list.length < 2;
+
+  const ul = $('#gradeList');
+  ul.innerHTML = '';
+  list.forEach((item, index) => {
+    const li = document.createElement('li');
+    li.className = 'grade-item';
+    li.style.setProperty('--i', String(Math.min(index, 8)));
+
+    const score = document.createElement('div');
+    score.className = 'grade-score';
+    score.textContent = String(item.score);
+    const full = document.createElement('em');
+    full.textContent = ` / ${item.full}`;
+    score.appendChild(full);
+
+    const main = document.createElement('div');
+    main.className = 'grade-main';
+    const title = document.createElement('div');
+    title.className = 'grade-title';
+    title.textContent = `${item.subject} · ${item.name}`;
+    const meta = document.createElement('div');
+    meta.className = 'grade-meta';
+    meta.textContent = `${item.date} · 得分率 ${((item.score / item.full) * 100).toFixed(0)}%`;
+    main.appendChild(title);
+    main.appendChild(meta);
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.setAttribute('aria-label', '删除这条成绩');
+    del.innerHTML = trashIcon();
+    del.addEventListener('click', () => {
+      if (!confirm('删除这条成绩？')) return;
+      store.set(KEY_GRADES, loadGrades().filter((x) => x.id !== item.id));
+      renderGrades();
+    });
+
+    li.appendChild(score);
+    li.appendChild(main);
+    li.appendChild(del);
+    ul.appendChild(li);
+  });
+
+  $('#gradeEmpty').hidden = list.length > 0;
+  ul.hidden = list.length === 0;
+
+  if (list.length >= 2) drawGradeChart();
+}
+
+function drawGradeChart() {
+  const canvas = $('#gradeChart');
+  if (!canvas || $('#chartCard').hidden) return;
+
+  const points = loadGrades()
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .slice(-12);
+  if (points.length < 2) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const width = canvas.parentElement.clientWidth - 32;
+  const height = 180;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, width, height);
+
+  const css = getComputedStyle(document.body);
+  const primary = css.getPropertyValue('--primary').trim() || '#4f7cff';
+  const muted = css.getPropertyValue('--muted').trim() || '#79839a';
+  const line = css.getPropertyValue('--line').trim() || '#e5e8f0';
+
+  const padL = 30, padR = 8, padT = 12, padB = 24;
+  const innerW = width - padL - padR;
+  const innerH = height - padT - padB;
+  const x = (i) => padL + (innerW * i) / (points.length - 1);
+  const y = (pct) => padT + innerH * (1 - pct / 100);
+
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = muted;
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 1;
+  [0, 50, 100].forEach((pct) => {
+    ctx.beginPath();
+    ctx.moveTo(padL, y(pct));
+    ctx.lineTo(width - padR, y(pct));
+    ctx.stroke();
+    ctx.fillText(String(pct), 6, y(pct) + 3);
+  });
+
+  ctx.strokeStyle = primary;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const pct = (p.score / p.full) * 100;
+    if (i === 0) ctx.moveTo(x(i), y(pct));
+    else ctx.lineTo(x(i), y(pct));
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = primary;
+  points.forEach((p, i) => {
+    const pct = (p.score / p.full) * 100;
+    ctx.beginPath();
+    ctx.arc(x(i), y(pct), 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = muted;
+  ctx.textAlign = 'center';
+  points.forEach((p, i) => {
+    if (points.length > 6 && i % 2 === 1) return;
+    ctx.fillText(p.date.slice(5).replace('-', '/'), x(i), height - 6);
+  });
+  ctx.textAlign = 'left';
+}
+
+/* ========================================================
+   习惯打卡
+   ======================================================== */
+function loadHabits() {
+  const list = store.get(KEY_HABITS, []);
+  return Array.isArray(list) ? list : [];
+}
+
+function habitStreak(habit) {
+  const days = habit.days || {};
+  let streak = 0;
+  let offset = days[dateKey()] ? 0 : 1; // 今天没打就从昨天算起
+  while (days[dateKey(new Date(Date.now() - (offset + streak) * 86400000))]) streak++;
+  return streak;
+}
+
+$('#habitForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const name = $('#habitName').value.trim();
+  if (!name) return;
+  const list = loadHabits();
+  list.push({ id: uid(), name, days: {}, createdAt: Date.now() });
+  store.set(KEY_HABITS, list);
+  $('#habitName').value = '';
+  renderHabits();
+  toast('已添加');
+});
+
+function renderHabits() {
+  const list = loadHabits();
+  const today = dateKey();
+  const ul = $('#habitList');
+  ul.innerHTML = '';
+
+  list.forEach((item, index) => {
+    const li = document.createElement('li');
+    li.className = 'habit-item';
+    li.style.setProperty('--i', String(Math.min(index, 8)));
+
+    const main = document.createElement('div');
+    main.className = 'habit-main';
+    const name = document.createElement('div');
+    name.className = 'habit-name';
+    name.textContent = item.name;
+    const streak = document.createElement('div');
+    streak.className = 'habit-streak';
+    const total = Object.keys(item.days || {}).length;
+    streak.textContent = `连续 ${habitStreak(item)} 天 · 共 ${total} 次`;
+    main.appendChild(name);
+    main.appendChild(streak);
+
+    const check = document.createElement('button');
+    check.type = 'button';
+    const doneToday = !!(item.days && item.days[today]);
+    check.className = 'habit-check' + (doneToday ? ' done' : '');
+    check.textContent = doneToday ? '已打卡' : '打卡';
+    check.addEventListener('click', () => {
+      const arr = loadHabits();
+      const target = arr.find((x) => x.id === item.id);
+      if (!target) return;
+      target.days = target.days || {};
+      if (target.days[today]) delete target.days[today];
+      else target.days[today] = true;
+      store.set(KEY_HABITS, arr);
+      renderHabits();
+    });
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.setAttribute('aria-label', `删除习惯 ${item.name}`);
+    del.innerHTML = trashIcon();
+    del.addEventListener('click', () => {
+      if (!confirm(`删除「${item.name}」？`)) return;
+      store.set(KEY_HABITS, loadHabits().filter((x) => x.id !== item.id));
+      renderHabits();
+    });
+
+    li.appendChild(main);
+    li.appendChild(check);
+    li.appendChild(del);
+    ul.appendChild(li);
+  });
+
+  $('#habitEmpty').hidden = list.length > 0;
+  ul.hidden = list.length === 0;
+}
+
+/* ========================================================
+   数据备份 / 清空
+   ======================================================== */
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function dataURLToBlob(dataURL) {
+  const [head, body] = dataURL.split(',');
+  const mime = (head.match(/:(.*?);/) || [])[1] || 'image/jpeg';
+  const bin = atob(body);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+function downloadFile(content, filename, type) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+$('#exportData').addEventListener('click', async () => {
+  const btn = $('#exportData');
+  btn.disabled = true;
+  try {
+    const data = {};
+    BACKUP_KEYS.forEach((k) => {
+      const raw = localStorage.getItem(k);
+      if (raw !== null) data[k] = raw;
+    });
+
+    const mistakes = [];
+    try {
+      const all = await dbAll();
+      for (const item of all) {
+        mistakes.push({
+          id: item.id,
+          subject: item.subject,
+          note: item.note,
+          createdAt: item.createdAt,
+          level: item.level || 0,
+          nextReview: item.nextReview || '',
+          reviewCount: item.reviewCount || 0,
+          image: item.image ? await blobToDataURL(item.image) : null
+        });
+      }
+    } catch (e) {
+      console.warn('错题读取失败', e);
+    }
+
+    const payload = { app: 'class-toolbox', version: 3, exportedAt: new Date().toISOString(), data, mistakes };
+    downloadFile(JSON.stringify(payload), `学习工具箱备份-${dateKey()}.json`, 'application/json');
+    toast('已导出备份文件');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('#importData').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+  try {
+    const payload = JSON.parse(await file.text());
+    if (!payload || payload.app !== 'class-toolbox' || typeof payload.data !== 'object') {
+      toast('这不是本工具的备份文件');
+      return;
+    }
+    if (!confirm('导入会覆盖当前数据，确定继续吗？')) return;
+
+    Object.entries(payload.data).forEach(([k, v]) => {
+      if (BACKUP_KEYS.includes(k) && typeof v === 'string') localStorage.setItem(k, v);
+    });
+
+    if (Array.isArray(payload.mistakes)) {
+      await dbClear();
+      for (const item of payload.mistakes) {
+        await dbPut({
+          id: item.id || uid(),
+          subject: item.subject || '未分类',
+          note: item.note || '',
+          createdAt: item.createdAt || Date.now(),
+          level: item.level || 0,
+          nextReview: item.nextReview || dateKey(),
+          reviewCount: item.reviewCount || 0,
+          image: item.image ? dataURLToBlob(item.image) : null
+        });
+      }
+    }
+    toast('导入完成');
+    show(currentView);
+  } catch (err) {
+    console.error(err);
+    toast('导入失败，文件可能损坏');
+  }
+});
+
+$('#wipeData').addEventListener('click', async () => {
+  if (!confirm('确定清空本机全部数据？此操作不可恢复。')) return;
+  if (!confirm('再确认一次：作业、错题、成绩、打卡都会被删掉。')) return;
+  BACKUP_KEYS.forEach((k) => localStorage.removeItem(k));
+  try { await dbClear(); } catch (e) { console.warn(e); }
+  toast('已清空');
+  setTimeout(() => location.reload(), 600);
+});
 
 /* ========================================================
    初始化
    ======================================================== */
-renderHomework();
-renderExams();
-renderMistakes();
-renderReview();
+updateFocusUI();
+show(location.hash.replace(/^#\//, '') || 'home');
 
 // 页面从后台回来时刷新倒计时/日期（跨天不至于显示错）
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    renderHomework();
-    renderExams();
-  }
+  if (document.visibilityState === 'visible') show(currentView);
 });
 
 // Service Worker：离线也能打开
